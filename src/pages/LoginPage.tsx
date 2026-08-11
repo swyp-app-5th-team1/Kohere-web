@@ -3,12 +3,11 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { login } from '../api/auth'
 import { ApiError } from '../api/client'
 import { KohereLogo } from '../components/KohereLogo'
+import { inputClass } from '../components/form/Field'
 
 type LocationState = { from?: { pathname?: string } }
 
-const fieldClass =
-  'h-14 w-full rounded-2xl border border-gray-300 bg-white px-4 text-lg font-semibold leading-6 ' +
-  'outline-none transition-colors placeholder:text-cool-neutral-10 focus:border-cool-neutral-50'
+const fieldClass = `${inputClass} font-semibold`
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -94,8 +93,9 @@ export default function LoginPage() {
               className={
                 'border-line-alternative flex h-12 w-full items-center justify-center rounded-2xl ' +
                 'border px-3 text-base leading-6 font-semibold text-white transition-colors ' +
+                // 활성 색은 회원가입 시안의 '가입하기' CTA(Primary/40)와 맞췄다. 로그인 시안엔 비활성만 있다.
                 (canSubmit
-                  ? 'bg-primary-50 hover:brightness-95'
+                  ? 'bg-primary-40 hover:brightness-95'
                   : 'bg-cool-neutral-20 cursor-not-allowed')
               }
             >

@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+/*
+ * Figma 디자인 토큰. 변수명은 시안의 이름을 그대로 따랐고,
+ * Tailwind v4 의 @theme 에 넣어 두면 bg-primary-50 / text-cool-neutral-50 처럼 바로 쓸 수 있다.
+ */
+@theme {
+  --color-primary-50: #f74425;
+
+  --color-cool-neutral-10: #c2c4c8;
+  --color-cool-neutral-20: #aeb0b6;
+  --color-cool-neutral-50: #70737c;
+
+  --color-gray-300: #d3d5dc;
+
+  --color-label-alternative: rgba(55, 56, 60, 0.72);
+  --color-line-alternative: rgba(112, 115, 124, 0.08);
+
+  --font-sans:
+    "Pretendard JP", Pretendard, -apple-system, BlinkMacSystemFont, system-ui,
+    "Apple SD Gothic Neo", sans-serif;
+  --font-display: "Fraunces", ui-serif, Georgia, serif;
+}
+
+/*
+ * 시안이 라이트 기준이라 OS · 브라우저 다크 테마를 따라가지 않도록 고정한다.
+ * color-scheme 을 지정하지 않으면 입력창 같은 브라우저 기본 UI 가 어둡게 렌더링된다.
+ */
+@layer base {
+  html {
+    color-scheme: light;
+  }
+
+  body {
+    background-color: #ffffff;
+    color: #37383c;
+    font-family: var(--font-sans);
+  }
+}

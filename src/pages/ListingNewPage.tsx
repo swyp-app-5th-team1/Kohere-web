@@ -1,145 +1,206 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AppHeader } from '../components/AppHeader'
-import { Field, inputClass } from '../components/form/Field'
-import arrowLeftUrl from '../assets/icon-arrow-left.svg'
-import arrowRightUrl from '../assets/icon-arrow-right.svg'
-import locationUrl from '../assets/icon-location.svg'
-
-const TOTAL_STEPS = 7
-const DESCRIPTION_MAX = 500
+import { PHOTO_MAX, type Photo } from '../components/form/PhotoPicker'
+import { AmenitiesStep } from '../components/listing-new/AmenitiesStep'
+import { BranchInfoStep } from '../components/listing-new/BranchInfoStep'
+import { BuildingInfoStep } from '../components/listing-new/BuildingInfoStep'
+import { ConditionsStep } from '../components/listing-new/ConditionsStep'
+import { ContactStep } from '../components/listing-new/ContactStep'
+import { ReviewStep } from '../components/listing-new/ReviewStep'
+import { RoomTypesStep } from '../components/listing-new/RoomTypesStep'
+import { SpaceTypeStep } from '../components/listing-new/SpaceTypeStep'
+import { SubmittedStep } from '../components/listing-new/SubmittedStep'
+import { SurveyStep } from '../components/listing-new/SurveyStep'
+import {
+  clearDraft,
+  emptyDraft,
+  loadDraft,
+  saveDraft,
+  type ListingDraft,
+} from '../components/listing-new/draft'
 
 /**
- * 매물 등록 1단계 — 지점 정보.
+ * 매물 등록 화면. 입력값을 한곳에 모아 두고 단계별 화면을 갈아 끼운다.
  *
- * UI 만 잡아둔 상태다. 주소 검색(다음 우편번호 등) · 인근 역 자동 계산 · 스텝 이동 ·
- * 서버 저장은 API 연동 때 붙인다. step 은 다음 단계 화면이 생기면 상태로 바꾼다.
+ * 헤더는 모든 단계가 같아서 여기서 한 번만 그리고, 본문과 하단(진행 표시줄 · 이전/다음)은
+ * 단계마다 달라 각 단계 컴포넌트가 StepFooter 로 직접 그린다.
+ * 매물 유형 선택은 진행 표시줄에 없는 앞 단계라 0 번이고, 표시줄은 지점 정보부터 1/7 로 센다.
+ *
+ * 임시 저장은 "다음" 을 누르는 순간에만 한다. 뒤로 갔다 와도 값이 남는 건 화면 상태 덕이고,
+ * 새로고침 후 살아나는 건 마지막으로 다음을 누른 시점까지다.
  */
 export default function ListingNewPage() {
-  const step = 1
+  const [draft, setDraft] = useState<ListingDraft>(loadDraft)
+  // 사진은 File 이라 임시 저장에 못 담는다. 화면을 떠나면 사라진다.
+  const [photos, setPhotos] = useState<Photo[]>([])
+  const [roomPhotos, setRoomPhotos] = useState<Record<string, Photo[]>>({})
+  const [expandedRoomId, setExpandedRoomId] = useState<string | null>(null)
 
-  const [name, setName] = useState('')
-  // 주소는 주소 검색 연동 때 setter 를 쓰게 되므로 지금은 값만 둔다.
-  const [address] = useState('')
-  const [addressDetail, setAddressDetail] = useState('')
-  const [nearbyStation, setNearbyStation] = useState('')
-  const [description, setDescription] = useState('')
+  const createdUrls = useRef<string[]>([])
+  useEffect(() => {
+    // 배열을 새로 만들지 않고 push 만 하므로, 마운트 때 잡아둔 참조로 전부 해제된다.
+    const urls = createdUrls.current
+    return () => urls.forEach((url) => URL.revokeObjectURL(url))
+  }, [])
+
+  /** 미리보기 주소는 상태 갱신 함수 밖에서 만든다. 안에서 만들면 두 번 실행돼 주소가 새어 나간다. */
+  const toPhotos = (files: File[], kept: number) =>
+    files.slice(0, PHOTO_MAX - kept).map((file) => {
+      const photo = { url: URL.createObjectURL(file), file }
+      createdUrls.current.push(photo.url)
+      return photo
+    })
+
+  const addPhotos = (files: File[]) => {
+    const added = toPhotos(files, photos.length)
+    if (added.length === 0) return
+    setPhotos((current) => [...current, ...added])
+  }
+
+  const addRoomPhotos = (roomId: string, files: File[]) => {
+    const added = toPhotos(files, roomPhotos[roomId]?.length ?? 0)
+    if (added.length === 0) return
+    setRoomPhotos((current) => ({ ...current, [roomId]: [...(current[roomId] ?? []), ...added] }))
+  }
+
+  /** 지운 사진의 미리보기 주소는 바로 놓아준다. 마운트가 끝날 때까지 들고 있을 이유가 없다. */
+  const dropPhoto = (list: Photo[], index: number) => {
+    URL.revokeObjectURL(list[index].url)
+    return list.filter((_, position) => position !== index)
+  }
+
+  /** 첫 장이 대표 사진이라 순서만 앞으로 당긴다. */
+  const liftPhoto = (list: Photo[], index: number) => [
+    list[index],
+    ...list.filter((_, position) => position !== index),
+  ]
+
+  const changeRoomPhotos = (roomId: string, change: (list: Photo[]) => Photo[]) => {
+    setRoomPhotos((current) => ({ ...current, [roomId]: change(current[roomId] ?? []) }))
+  }
+
+  const goPrev = () => setDraft((current) => ({ ...current, step: current.step - 1 }))
+
+  const goNext = () => {
+    setDraft((current) => {
+      const next = { ...current, step: current.step + 1 }
+      saveDraft(next)
+      return next
+    })
+  }
+
+  /** 제출하면 임시 저장본을 비운다. 서버 연동 전이라 화면만 완료로 넘긴다. */
+  const submit = () => {
+    clearDraft()
+    setDraft((current) => ({ ...current, step: 9 }))
+  }
+
+  const restart = () => {
+    clearDraft()
+    setDraft(emptyDraft())
+    setPhotos([])
+    setRoomPhotos({})
+    setExpandedRoomId(null)
+  }
+
+  const patch = <Section extends 'branch' | 'building' | 'conditions' | 'survey' | 'contact'>(
+    section: Section,
+  ) => {
+    return (values: Partial<ListingDraft[Section]>) =>
+      setDraft((current) => ({ ...current, [section]: { ...current[section], ...values } }))
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-white">
       <AppHeader />
 
-      <main className="flex w-full flex-1 flex-col items-center px-6 py-14">
-        <div className="flex w-full max-w-[980px] flex-col gap-8">
-          <h1 className="text-[32px] leading-6 font-bold text-[#242424]">지점을 소개해 주세요.</h1>
-
-          <Field label="지점명">
-            <input
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="지점 이름을 입력하세요"
-              className={inputClass + ' font-medium'}
-            />
-          </Field>
-
-          <div className="flex w-full flex-col gap-5">
-            <Field label="주소">
-              <div className="flex w-full items-stretch gap-5">
-                {/* 도로명 주소는 직접 입력 대신 주소 검색으로 채울 예정이라 읽기 전용으로 둔다. */}
-                <input
-                  value={address}
-                  readOnly
-                  placeholder="주소 검색하기"
-                  className={inputClass + ' min-w-0 flex-1 font-medium'}
-                />
-                <button
-                  type="button"
-                  className="bg-label-normal border-line-normal flex w-[158px] shrink-0 items-center justify-center rounded-2xl border px-3 text-base leading-6 font-semibold text-white transition-colors hover:brightness-125"
-                >
-                  주소검색
-                </button>
-              </div>
-            </Field>
-
-            <Field label="상세 주소">
-              <input
-                value={addressDetail}
-                onChange={(event) => setAddressDetail(event.target.value)}
-                placeholder="예: 101동"
-                className={inputClass + ' font-medium'}
-              />
-            </Field>
-          </div>
-
-          <Field label="인근 역">
-            <div className="flex h-14 w-full items-center gap-3 rounded-2xl border border-gray-300 bg-white px-4">
-              <img src={locationUrl} alt="" className="size-6 shrink-0" />
-              <input
-                value={nearbyStation}
-                onChange={(event) => setNearbyStation(event.target.value)}
-                placeholder="예: 2호선 신촌역 도보 7분"
-                aria-label="인근 역"
-                className="text-cool-neutral-80 placeholder:text-cool-neutral-10 min-w-0 flex-1 text-lg leading-6 outline-none placeholder:font-medium"
-              />
-              <button
-                type="button"
-                className="text-cool-neutral-30 shrink-0 text-xs leading-6 font-medium"
-              >
-                위치 수정
-              </button>
-            </div>
-          </Field>
-
-          <Field
-            label="지점 소개글"
-            labelEnd={
-              <span className="text-label-neutral text-sm leading-5 font-medium">
-                {description.length} / {DESCRIPTION_MAX}
-              </span>
-            }
-          >
-            <textarea
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              maxLength={DESCRIPTION_MAX}
-              placeholder="지점을 소개하는 내용을 작성해주세요"
-              className="placeholder:text-cool-neutral-10 focus:border-cool-neutral-50 h-[100px] w-full resize-none rounded-2xl border border-gray-300 bg-white p-4 text-lg leading-6 font-medium outline-none transition-colors"
-            />
-          </Field>
-        </div>
-      </main>
-
-      <footer className="w-full shrink-0">
-        {/* 스텝 진행 표시줄. 지나온 스텝만 진하게 칠한다. */}
-        <div className="flex w-full gap-[7px]">
-          {Array.from({ length: TOTAL_STEPS }, (_, index) => (
-            <div
-              key={index}
-              className={
-                'h-1.5 flex-1 rounded-full ' +
-                (index < step ? 'bg-neutral-70' : 'bg-cool-neutral-7')
-              }
-            />
-          ))}
-        </div>
-
-        <div className="mx-auto flex w-full max-w-[980px] items-center justify-between px-6 py-10">
-          <button
-            type="button"
-            disabled={step === 1}
-            className="bg-cool-neutral-20 border-line-normal flex h-12 w-[158px] items-center justify-center gap-3 rounded-2xl border px-3 text-base leading-6 font-semibold text-white disabled:cursor-not-allowed"
-          >
-            <img src={arrowLeftUrl} alt="" className="size-6" />
-            이전
-          </button>
-          <button
-            type="button"
-            className="bg-label-normal border-line-normal flex h-12 w-[158px] items-center justify-center gap-3 rounded-2xl border px-3 text-base leading-6 font-semibold text-white transition-colors hover:brightness-125"
-          >
-            다음
-            <img src={arrowRightUrl} alt="" className="size-6" />
-          </button>
-        </div>
-      </footer>
+      {draft.step === 0 && (
+        <SpaceTypeStep
+          value={draft.spaceType}
+          onChange={(spaceType) => setDraft((current) => ({ ...current, spaceType }))}
+          onNext={goNext}
+        />
+      )}
+      {draft.step === 1 && (
+        <BranchInfoStep
+          value={draft.branch}
+          onChange={patch('branch')}
+          onPrev={goPrev}
+          onNext={goNext}
+        />
+      )}
+      {draft.step === 2 && (
+        <BuildingInfoStep
+          value={draft.building}
+          onChange={patch('building')}
+          photos={photos}
+          onAddPhotos={addPhotos}
+          onRemovePhoto={(index) => setPhotos((current) => dropPhoto(current, index))}
+          onMakePhotoPrimary={(index) => setPhotos((current) => liftPhoto(current, index))}
+          onPrev={goPrev}
+          onNext={goNext}
+        />
+      )}
+      {draft.step === 3 && (
+        <ConditionsStep
+          value={draft.conditions}
+          onChange={patch('conditions')}
+          onPrev={goPrev}
+          onNext={goNext}
+        />
+      )}
+      {draft.step === 4 && (
+        <AmenitiesStep
+          value={draft.amenities}
+          onChange={(amenities) => setDraft((current) => ({ ...current, amenities }))}
+          onPrev={goPrev}
+          onNext={goNext}
+        />
+      )}
+      {draft.step === 5 && (
+        <RoomTypesStep
+          value={draft.roomTypes}
+          onChange={(roomTypes) => setDraft((current) => ({ ...current, roomTypes }))}
+          expandedId={expandedRoomId}
+          onExpandedChange={setExpandedRoomId}
+          photos={roomPhotos}
+          onAddPhotos={addRoomPhotos}
+          onRemovePhoto={(roomId, index) =>
+            changeRoomPhotos(roomId, (list) => dropPhoto(list, index))
+          }
+          onMakePhotoPrimary={(roomId, index) =>
+            changeRoomPhotos(roomId, (list) => liftPhoto(list, index))
+          }
+          onPrev={goPrev}
+          onNext={goNext}
+        />
+      )}
+      {draft.step === 6 && (
+        <SurveyStep
+          value={draft.survey}
+          onChange={patch('survey')}
+          onPrev={goPrev}
+          onNext={goNext}
+        />
+      )}
+      {draft.step === 7 && (
+        <ContactStep
+          value={draft.contact}
+          onChange={patch('contact')}
+          onPrev={goPrev}
+          onNext={goNext}
+        />
+      )}
+      {draft.step === 8 && (
+        <ReviewStep
+          draft={draft}
+          photos={photos}
+          roomPhotos={roomPhotos}
+          onSaveDraft={() => saveDraft(draft)}
+          onSubmit={submit}
+        />
+      )}
+      {draft.step === 9 && <SubmittedStep onRestart={restart} />}
     </div>
   )
 }

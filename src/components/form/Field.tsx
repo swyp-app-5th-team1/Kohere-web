@@ -14,13 +14,15 @@ type FieldProps = {
   required?: boolean
   /** 라벨 행 오른쪽 끝에 붙는 요소 */
   labelEnd?: ReactNode
+  /** 라벨과 내용 사이 간격. 사진 묶음처럼 8px 인 화면이 있어 열어 둔다. */
+  gap?: string
   children: ReactNode
 }
 
 /** 라벨 + 입력 묶음. 시안의 라벨(18px semibold #505050)과 4px 간격을 따른다. */
-export function Field({ label, required, labelEnd, children }: FieldProps) {
+export function Field({ label, required, labelEnd, gap = 'gap-1', children }: FieldProps) {
   return (
-    <div className="flex w-full flex-col gap-1">
+    <div className={'flex w-full flex-col ' + gap}>
       <div className="flex items-center gap-2.5 px-1">
         <span className="text-neutral-70 flex-1 text-lg leading-6 font-semibold">
           {label}

@@ -5,16 +5,25 @@
  * Tailwind v4 의 @theme 에 넣어 두면 bg-primary-50 / text-cool-neutral-50 처럼 바로 쓸 수 있다.
  */
 @theme {
+  --color-primary-5: #feece9;
   --color-primary-40: #ff583b;
   --color-primary-50: #f74425;
 
+  --color-secondary-5: #fffdf8;
+  --color-secondary-10: #f9f7f2;
+
   --color-cool-neutral-7: #eaebec;
+  --color-cool-neutral-8: #e1e2e4;
   --color-cool-neutral-10: #c2c4c8;
   --color-cool-neutral-20: #aeb0b6;
   --color-cool-neutral-30: #989ba2;
+  --color-cool-neutral-40: #878a93;
   --color-cool-neutral-50: #70737c;
+  --color-cool-neutral-70: #46474c;
   --color-cool-neutral-80: #292a2d;
 
+  --color-neutral-30: #999999;
+  --color-neutral-50: #767676;
   --color-neutral-70: #505050;
 
   --color-gray-200: #e5e7ea;

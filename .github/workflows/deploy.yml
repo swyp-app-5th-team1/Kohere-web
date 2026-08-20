@@ -1,0 +1,158 @@
+# 임대인 웹 dev 배포 — release 브랜치 push 시 build → S3 releases/<sha>/ 업로드 →
+#   SSM 전용 Document 로 호스트가 내려받아 current 링크 원자 교체 → 완료까지 폴링 → 스모크.
+# 롤백은 workflow_dispatch 의 sha 입력. 아티팩트가 남아 있으면 재빌드 없이 링크만 되돌린다.
+name: Deploy (dev)
+
+on:
+  push:
+    branches: [release]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: '롤백할 릴리스 SHA(40자 소문자 16진수). 비우면 현재 커밋을 빌드해 배포'
+        required: false
+        default: ''
+
+# 배포는 겹치면 안 되고, 중간에 끊기면 더 나쁘다 — 큐잉하되 취소하지 않는다.
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  WEB_ARTIFACTS_BUCKET: ${{ vars.WEB_ARTIFACTS_BUCKET }}
+  SSM_DEPLOY_WEB_DOCUMENT: ${{ vars.SSM_DEPLOY_WEB_DOCUMENT }}
+  DEV_HOST_NAME: ${{ vars.DEV_HOST_NAME }}
+  DEV_URL: ${{ vars.DEV_URL }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # OIDC — 저장된 AWS 키 없음
+      contents: read
+    steps:
+      # 리포 Variables 는 기본값이 없다. 하나라도 비면 조용히 진행하지 않고 에러로 죽는다.
+      - name: Verify required repo variables
+        env:
+          AWS_DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+        run: |
+          missing=()
+          for v in AWS_DEPLOY_ROLE_ARN AWS_REGION WEB_ARTIFACTS_BUCKET \
+                   SSM_DEPLOY_WEB_DOCUMENT DEV_HOST_NAME DEV_URL; do
+            [ -z "${!v}" ] && missing+=("$v")
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::필수 리포 Variables 미설정: ${missing[*]}"
+            exit 1
+          fi
+
+      # SSM Document 의 allowedPattern 이 ^[0-9a-f]{7,40}$ 이다. 여기서 먼저 막아
+      #   AWS 에러 대신 읽을 수 있는 메시지를 낸다.
+      # 입력값은 env 로 받는다 — run 본문에 ${{ }} 로 직접 박으면 검증이 돌기 전에
+      #   셸이 먼저 해석해, 수동 실행 권한만 있으면 임의 명령을 끼워 넣을 수 있다.
+      - name: Resolve target SHA
+        id: target
+        env:
+          INPUT_SHA: ${{ inputs.sha }}
+        run: |
+          if [ -n "$INPUT_SHA" ]; then
+            printf '%s' "$INPUT_SHA" | grep -Eq '^[0-9a-f]{7,40}$' || {
+              echo "::error::sha 는 소문자 16진수 7~40자여야 한다"; exit 1; }
+            echo "sha=$INPUT_SHA" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v6
+        with:
+          # 롤백이어도 아티팩트가 만료됐으면 그 커밋을 재빌드해야 한다.
+          ref: ${{ steps.target.outputs.sha }}
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # 이미 올라간 릴리스면 빌드·업로드를 건너뛴다 — 이게 "재빌드 없는 롤백"이다.
+      #   보관 기간(90일)이 지나 사라졌으면 아래에서 재빌드한다(당시 번들과 바이트 동일 보장은 없다).
+      - name: Check existing artifact
+        id: artifact
+        env:
+          SHA: ${{ steps.target.outputs.sha }}
+        run: |
+          if aws s3 ls "s3://$WEB_ARTIFACTS_BUCKET/releases/$SHA/index.html" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::릴리스 $SHA 재사용 — 재빌드 없이 링크만 교체한다"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.artifact.outputs.exists == 'false'
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Build
+        if: steps.artifact.outputs.exists == 'false'
+        run: |
+          npm ci
+          npm run build
+          # 호스트가 이 파일로 릴리스 무결성을 판단한다. 없으면 배포가 여기서 멈추는 게 낫다.
+          [ -f dist/index.html ] || { echo "::error::dist/index.html 없음"; exit 1; }
+
+      # dist/ 의 "내용"을 올린다. --delete 는 쓰지 않는다(매번 새 프리픽스라 지울 대상이 없고,
+      #   역할에 DeleteObject 권한 자체가 없다).
+      - name: Upload release
+        if: steps.artifact.outputs.exists == 'false'
+        env:
+          SHA: ${{ steps.target.outputs.sha }}
+        run: |
+          aws s3 sync dist/ "s3://$WEB_ARTIFACTS_BUCKET/releases/$SHA/"
+
+      - name: Apply release on dev host (SSM)
+        id: ssm
+        env:
+          SHA: ${{ steps.target.outputs.sha }}
+        run: |
+          CMD_ID=$(aws ssm send-command \
+            --document-name "$SSM_DEPLOY_WEB_DOCUMENT" \
+            --targets "Key=tag:Name,Values=$DEV_HOST_NAME" \
+            --parameters "sha=$SHA" \
+            --comment "web deploy $SHA" \
+            --query "Command.CommandId" --output text)
+          echo "cmd_id=$CMD_ID" >> "$GITHUB_OUTPUT"
+          echo "SSM CommandId: $CMD_ID"
+
+      # send-command 는 큐잉만 확인하고 0을 리턴한다. 폴링하지 않으면 호스트에서
+      #   무엇이 실패했든 워크플로가 초록불이 된다.
+      - name: Wait for SSM completion
+        env:
+          CMD_ID: ${{ steps.ssm.outputs.cmd_id }}
+        run: |
+          for i in $(seq 1 60); do
+            STATUS=$(aws ssm list-command-invocations --command-id "$CMD_ID" \
+              --query "CommandInvocations[0].Status" --output text 2>/dev/null || echo "None")
+            case "$STATUS" in
+              Success) echo "SSM 성공"; exit 0 ;;
+              Failed|Cancelled|TimedOut)
+                IID=$(aws ssm list-command-invocations --command-id "$CMD_ID" \
+                  --query "CommandInvocations[0].InstanceId" --output text)
+                echo "::error::SSM $STATUS"
+                aws ssm get-command-invocation --command-id "$CMD_ID" --instance-id "$IID" \
+                  --query "StandardErrorContent" --output text
+                exit 1 ;;
+            esac
+            sleep 5   # 등록 직후엔 None 이 잠깐 나온다 — 그대로 재시도한다
+          done
+          echo "::error::SSM 완료 대기 타임아웃(5분)"; exit 1
+
+      # index.html 은 no-cache 라 스모크가 항상 최신을 본다.
+      - name: Smoke check
+        run: |
+          set -e
+          curl -fsS -o /dev/null "$DEV_URL/"                    # 루트
+          curl -fsS -o /dev/null "$DEV_URL/listings"            # SPA 딥링크 폴백
+          curl -fsS -o /dev/null "$DEV_URL/actuator/health"     # 백엔드 회귀

@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [develop, release]
+
+# PR 은 최신 커밋만 검증하면 된다 — 배포와 달리 중간에 끊겨도 안전하다.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      # 테스트 러너가 아직 없어 test 스텝은 두지 않는다. 0개를 통과시키는 초록불은
+      #   "검증했다"는 착각만 남기므로, 러너를 붙이는 시점에 함께 추가한다.
+      - run: npm run build

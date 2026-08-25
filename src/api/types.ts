@@ -38,9 +38,13 @@ export type CodeLabel = {
   label: string
 }
 
-/** 로그인·재발급 응답의 토큰 묶음. */
+/**
+ * 로그인·재발급 응답의 토큰 묶음.
+ *
+ * refresh 토큰은 여기 없다. 서버가 `Set-Cookie: refreshToken` 으로만 내려주고
+ * JS 에서는 읽을 수 없다(HttpOnly). 읽을 필요도 없다 — 재발급 요청에 쿠키가 자동으로 실린다.
+ */
 export type AuthTokens = {
   tokenType: string
   accessToken: string
-  refreshToken: string
 }

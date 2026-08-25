@@ -1,7 +1,9 @@
 import { Chip, ChipGroup } from '../form/Chip'
-import { Field, inputClass } from '../form/Field'
+import { Field } from '../form/Field'
 import { PhotoPicker, type Photo } from '../form/PhotoPicker'
+import { TextField } from '../form/TextField'
 import { StepFooter } from './StepFooter'
+import { StepTitle } from './StepTitle'
 import { createRoomType, type RoomTypeDraft } from './draft'
 import chevronUrl from '../../assets/icon-chevron-down.svg'
 import plusUrl from '../../assets/icon-plus.svg'
@@ -94,9 +96,7 @@ export function RoomTypesStep({
     <>
       <main className="flex w-full flex-1 flex-col items-center px-6 py-14">
         <div className="flex w-full max-w-[980px] flex-col gap-8">
-          <h1 className="text-[32px] leading-6 font-bold text-[#242424]">
-            각 방과 가격 정보를 입력해주세요.
-          </h1>
+          <StepTitle>각 방과 가격 정보를 입력해주세요.</StepTitle>
 
           <div className="flex w-full flex-col gap-6">
             {value.map((room, index) => {
@@ -150,49 +150,49 @@ export function RoomTypesStep({
                   <div className="flex w-full items-start gap-8">
                     <div className="min-w-0 flex-1">
                       <Field label="방 이름">
-                        <input
+                        <TextField
                           value={room.name}
                           onChange={(event) => patchRoom(room.id, { name: event.target.value })}
                           placeholder="입력"
-                          className={inputClass + ' font-medium'}
-                        />
+                          className="font-medium"
+                          />
                       </Field>
                     </div>
                     {actions}
                   </div>
 
                   <Field label="보증금">
-                    <input
+                    <TextField
                       value={room.deposit}
                       onChange={(event) => patchRoom(room.id, { deposit: event.target.value })}
                       placeholder="입력하기"
-                      className={inputClass + ' font-medium'}
-                    />
+                      className="font-medium"
+                      />
                   </Field>
 
                   <div className="flex w-full gap-8">
                     <div className="min-w-0 flex-1">
                       <Field label="관리비">
-                        <input
+                        <TextField
                           value={room.maintenanceFee}
                           onChange={(event) =>
                             patchRoom(room.id, { maintenanceFee: event.target.value })
                           }
                           placeholder="입력하기"
-                          className={inputClass + ' font-medium'}
-                        />
+                          className="font-medium"
+                          />
                       </Field>
                     </div>
                     <div className="min-w-0 flex-1">
                       <Field label="월세">
-                        <input
+                        <TextField
                           value={room.monthlyRent}
                           onChange={(event) =>
                             patchRoom(room.id, { monthlyRent: event.target.value })
                           }
                           placeholder="입력하기"
-                          className={inputClass + ' font-medium'}
-                        />
+                          className="font-medium"
+                          />
                       </Field>
                     </div>
                   </div>
@@ -200,12 +200,12 @@ export function RoomTypesStep({
                   <div className="flex w-full items-end gap-2.5">
                     <div className="min-w-0 flex-1">
                       <Field label="이용기간">
-                        <input
+                        <TextField
                           value={room.minPeriod}
                           onChange={(event) => patchRoom(room.id, { minPeriod: event.target.value })}
                           placeholder="최소"
-                          className={inputClass + ' font-medium'}
-                        />
+                          className="font-medium"
+                          />
                       </Field>
                     </div>
                     <span className="text-neutral-70 flex h-14 shrink-0 items-center text-lg leading-6">
@@ -215,13 +215,13 @@ export function RoomTypesStep({
                       {/* 오른쪽 칸은 라벨이 없지만 시안에서 높이를 맞춰 두었다. */}
                       <div className="flex w-full flex-col gap-1">
                         <div className="h-6" aria-hidden />
-                        <input
+                        <TextField
                           value={room.maxPeriod}
                           onChange={(event) => patchRoom(room.id, { maxPeriod: event.target.value })}
                           placeholder="최대"
                           aria-label="이용기간 최대"
-                          className={inputClass + ' font-medium'}
-                        />
+                          className="font-medium"
+                          />
                       </div>
                     </div>
                   </div>

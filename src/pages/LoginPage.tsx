@@ -1,13 +1,19 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { login } from '../api/auth'
+import { login, loginErrorMessage } from '../api/auth'
 import { ApiError } from '../api/client'
 import { KohereLogo } from '../components/KohereLogo'
-import { inputClass } from '../components/form/Field'
+import { AccountLockedDialog, LoginFailedDialog } from '../components/LoginDialogs'
+import { inputClass, passwordMaskClass } from '../components/form/Field'
+import eyeHiddenUrl from '../assets/icon-eye-hidden.png'
 
 type LocationState = { from?: { pathname?: string } }
 
+/** 시안에 팝업이 있는 실패만 따로 띄우고, 나머지는 입력칸 아래 문구로 알린다. */
+type Dialog = 'failed' | 'locked' | null
+
 const fieldClass = `${inputClass} font-semibold`
+const passwordFieldClass = `${fieldClass} ${passwordMaskClass}`
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -17,6 +23,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [dialog, setDialog] = useState<Dialog>(null)
+  const [passwordShown, setPasswordShown] = useState(false)
 
   // 시안의 로그인 버튼은 회색(비활성) 상태로 그려져 있다. 두 칸이 모두 채워지면 활성화한다.
   const canSubmit = email.trim() !== '' && password !== '' && !submitting
@@ -27,11 +35,13 @@ export default function LoginPage() {
 
     setSubmitting(true)
     setErrorMessage(null)
+    setDialog(null)
 
     try {
       const result = await login(email, password)
 
-      // 온보딩(사업자번호 · 휴대폰 인증)을 마치지 않았으면 먼저 그쪽으로 보낸다.
+      // 웹 로그인은 서버가 onboardingRequired 를 항상 false 로 준다. 나중에 온보딩 재개가
+      // 생겨도 화면을 고치지 않도록 분기는 남겨 둔다.
       if (result.onboardingRequired) {
         navigate('/onboarding', { replace: true })
         return
@@ -41,11 +51,12 @@ export default function LoginPage() {
       const from = (location.state as LocationState | null)?.from?.pathname
       navigate(from ?? '/listings', { replace: true })
     } catch (error) {
-      setErrorMessage(
-        error instanceof ApiError
-          ? error.message
-          : '로그인 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.',
-      )
+      const code = error instanceof ApiError ? error.code : null
+
+      // 잠금과 자격증명 오류는 시안에 팝업이 있다. 입력값 오류·시도 초과는 문구로만 알린다.
+      if (code === 'AUTH_ACCOUNT_LOCKED') setDialog('locked')
+      else if (code === 'AUTH_INVALID_CREDENTIALS') setDialog('failed')
+      else setErrorMessage(loginErrorMessage(error))
     } finally {
       setSubmitting(false)
     }
@@ -68,16 +79,36 @@ export default function LoginPage() {
               onChange={(event) => setEmail(event.target.value)}
               className={fieldClass}
             />
-            <input
-              type="password"
-              required
-              autoComplete="current-password"
-              aria-label="비밀번호"
-              placeholder="비밀번호"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              className={fieldClass}
-            />
+            {/* 시안(224:30111)에 눈 아이콘이 생겼다. 아이콘은 칸 안 오른쪽 끝에 붙는다. */}
+            <div className="relative w-full">
+              <input
+                type={passwordShown ? 'text' : 'password'}
+                required
+                autoComplete="current-password"
+                aria-label="비밀번호"
+                placeholder="비밀번호"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                className={`${passwordFieldClass} pr-12`}
+              />
+              <button
+                type="button"
+                onClick={() => setPasswordShown((shown) => !shown)}
+                aria-label={passwordShown ? '비밀번호 숨기기' : '비밀번호 표시'}
+                aria-pressed={passwordShown}
+                className="absolute top-1/2 right-3.5 flex size-8 -translate-y-1/2 items-center justify-center"
+              >
+                {/*
+                 * 시안에 감은 눈 아이콘 하나만 있어서, 보이는 동안은 흐리게 해서 상태를 구분한다.
+                 * 뜬 눈 아이콘을 받으면 이 자리를 그걸로 바꾼다.
+                 */}
+                <img
+                  src={eyeHiddenUrl}
+                  alt=""
+                  className={'size-5 ' + (passwordShown ? 'opacity-40' : '')}
+                />
+              </button>
+            </div>
           </div>
 
           {errorMessage && (
@@ -113,6 +144,14 @@ export default function LoginPage() {
           </div>
         </form>
       </div>
+
+      <LoginFailedDialog open={dialog === 'failed'} onClose={() => setDialog(null)} />
+
+      {/* 열릴 때 붙여야 안에 있는 이메일 칸이 지금 입력값으로 채워진다. 계속 붙여 두면
+          맨 처음 마운트될 때의 빈 값이 그대로 남는다. */}
+      {dialog === 'locked' && (
+        <AccountLockedDialog open onClose={() => setDialog(null)} defaultEmail={email} />
+      )}
     </div>
   )
 }

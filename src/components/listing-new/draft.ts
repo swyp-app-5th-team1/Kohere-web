@@ -14,6 +14,8 @@ const DRAFT_KEY = 'kohere.listingDraft'
 
 export type BranchDraft = {
   name: string
+  /** 우편번호 5자리. 주소 검색이 함께 주는 값이라 버리지 않고 담아 둔다. */
+  postalCode: string
   address: string
   addressDetail: string
   nearbyStation: string
@@ -77,12 +79,10 @@ export type ListingDraft = {
   contact: ContactDraft
 }
 
-let roomTypeSeq = 0
-
 export function createRoomType(): RoomTypeDraft {
-  roomTypeSeq += 1
   return {
-    id: `room-${roomTypeSeq}`,
+    // 순번을 쓰면 새로고침 때 0 부터 다시 세는 바람에 저장돼 있던 방 타입과 id 가 겹친다.
+    id: crypto.randomUUID(),
     name: '',
     deposit: '',
     maintenanceFee: '',
@@ -98,7 +98,14 @@ export function emptyDraft(): ListingDraft {
   return {
     step: 0,
     spaceType: null,
-    branch: { name: '', address: '', addressDetail: '', nearbyStation: '', description: '' },
+    branch: {
+      name: '',
+      postalCode: '',
+      address: '',
+      addressDetail: '',
+      nearbyStation: '',
+      description: '',
+    },
     building: {
       buildingType: '',
       totalFloors: '',

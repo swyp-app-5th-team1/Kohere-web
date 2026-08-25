@@ -1,4 +1,5 @@
 import { StepFooter } from './StepFooter'
+import { StepTitle } from './StepTitle'
 import { SPACE_TYPES, type SpaceType } from './spaceTypes'
 import checkUrl from '../../assets/icon-circle-check-fill.svg'
 
@@ -18,12 +19,17 @@ export function SpaceTypeStep({ value, onChange, onNext }: SpaceTypeStepProps) {
     <>
       <main className="flex w-full flex-1 flex-col items-center justify-center px-6 py-14">
         <div className="flex w-full max-w-[980px] flex-col gap-8">
-          <h1 className="text-[32px] leading-6 font-bold text-[#242424]">
-            어떤 공간을 등록하시나요?
-          </h1>
+          <StepTitle>어떤 공간을 등록하시나요?</StepTitle>
 
-          {/* 라디오처럼 하나만 고르는 카드 묶음 */}
-          <div role="radiogroup" aria-label="매물 유형" className="flex w-full items-center gap-6">
+          {/*
+            라디오처럼 하나만 고르는 카드 묶음.
+            좁은 화면에서는 시안(182:7205)대로 세로로 쌓고 아이콘을 왼쪽에 둔다.
+          */}
+          <div
+            role="radiogroup"
+            aria-label="매물 유형"
+            className="flex w-full flex-col gap-4 md:flex-row md:items-center md:gap-6"
+          >
             {SPACE_TYPES.map((type) => {
               const selected = value === type.value
 
@@ -35,12 +41,14 @@ export function SpaceTypeStep({ value, onChange, onNext }: SpaceTypeStepProps) {
                   aria-checked={selected}
                   onClick={() => onChange(type.value)}
                   className={
-                    // 너비는 셋으로 정확히 나눠 고정한다. flex-1 로 두면 선택된 카드의 테두리
-                    // 2px 만큼 그 칸만 넓어져서 시안의 310.67px 배분이 깨진다.
-                    'relative flex min-h-[200px] shrink-0 grow-0 basis-[calc((100%_-_48px)/3)] cursor-pointer flex-col items-center justify-center gap-4 rounded-xl px-[18px] py-[50px] shadow-[0_0_5px_rgba(23,23,23,0.08)] transition-colors ' +
+                    // 넓은 화면의 너비는 셋으로 정확히 나눠 고정한다. flex-1 로 두면 선택된 카드의
+                    // 테두리 2px 만큼 그 칸만 넓어져서 시안의 310.67px 배분이 깨진다.
+                    'relative flex cursor-pointer items-center gap-4 rounded-xl px-5 py-5 shadow-[0_0_5px_rgba(23,23,23,0.08)] transition-colors ' +
+                    'md:min-h-[200px] md:shrink-0 md:grow-0 md:basis-[calc((100%_-_48px)/3)] md:flex-col md:justify-center md:px-[18px] md:py-[50px] ' +
                     (selected
                       ? 'border-primary-40 bg-primary-5 border-2'
-                      : 'bg-cool-neutral-7 hover:bg-white')
+                      : // 기본은 테두리 없는 회색, hover 는 흰 배경 + neutral/30 테두리다.
+                        'bg-cool-neutral-7 hover:border hover:border-neutral-30 hover:bg-white')
                   }
                 >
                   <type.Icon
@@ -50,7 +58,7 @@ export function SpaceTypeStep({ value, onChange, onNext }: SpaceTypeStepProps) {
                     }
                   />
 
-                  <div className="flex w-full flex-col items-center gap-1.5 text-lg leading-6 whitespace-nowrap">
+                  <div className="flex flex-col items-start gap-1.5 text-lg leading-6 whitespace-nowrap md:w-full md:items-center">
                     <span className="text-neutral-70 font-semibold">{type.label}</span>
                     <span className="text-cool-neutral-40 font-medium">{type.description}</span>
                   </div>

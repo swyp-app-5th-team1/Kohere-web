@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { StepTitle } from './StepTitle'
 import checkUrl from '../../assets/icon-circle-check-large.svg'
 
 /** 접수 번호는 서버가 발급한다. 연동 전까지는 시안의 값을 그대로 보여준다. */
@@ -23,9 +24,7 @@ export function SubmittedStep({ onRestart }: SubmittedStepProps) {
       <div className="flex w-[423px] max-w-full flex-col items-center gap-12">
         <div className="flex flex-col items-center gap-4">
           <img src={checkUrl} alt="" className="size-[100px]" />
-          <h1 className="text-center text-[32px] leading-6 font-bold text-[#242424]">
-            제출이 완료되었어요!
-          </h1>
+          <StepTitle className="text-center">제출이 완료되었어요!</StepTitle>
         </div>
 
         <p className="text-label-alternative text-center text-base leading-6 font-semibold">

@@ -1,6 +1,7 @@
 import { Chip } from '../form/Chip'
 import { Field } from '../form/Field'
 import { StepFooter } from './StepFooter'
+import { StepTitle } from './StepTitle'
 import type { SurveyDraft } from './draft'
 
 const NATIONALITIES = ['일본', '미국', '중국', '동남아', '유럽']
@@ -44,7 +45,7 @@ export function SurveyStep({ value, onChange, onPrev, onNext }: SurveyStepProps)
       <main className="flex w-full flex-1 flex-col items-center px-6 py-14">
         <div className="flex w-full max-w-[980px] flex-col gap-8">
           <div className="flex flex-col gap-1">
-            <h1 className="text-[32px] leading-6 font-bold text-[#242424]">추가 질문 사항 (선택)</h1>
+            <StepTitle>추가 질문 사항 (선택)</StepTitle>
             <p className="text-cool-neutral-30 text-xs leading-6 font-medium">
               더 나은 서비스를 만들기 위한 질문입니다. 답변 내용은 임차인에게 전달되지 않습니다.
             </p>

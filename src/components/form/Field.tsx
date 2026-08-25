@@ -1,12 +1,103 @@
 import type { ReactNode } from 'react'
 
-/**
- * 디자인 시스템의 기본 입력 상자 스타일 (h56 · r16 · gray-300 테두리).
- * 글자 굵기는 화면마다 달라서(로그인 semibold, 회원가입 medium) 호출부에서 붙인다.
+/*
+ * 디자인 시스템 「입력 필드 Input Field」의 상태들.
+ *
+ * | 상태 | 배경 | 테두리 | 글자 |
+ * | default | white | gray/300 | placeholder cool-neutral/10 |
+ * | hover | cool-neutral/5 | neutral/30 | 그대로 |
+ * | active · on-change (포커스) | white | primary/50 | 값 cool-neutral/70 |
+ * | completed (값 있음) | white | neutral/10 | 값 cool-neutral/70 |
+ * | error | status/red/5 | status/red/50 | 값 cool-neutral/70 |
+ * | disabled | cool-neutral/7 | 없음 | cool-neutral/10 |
+ *
+ * 글자 굵기는 문서상 SemiBold 인데 매물 등록 화면 시안은 Medium 으로 그려져 있어
+ * 호출부에서 붙인다. 어느 쪽이 맞는지는 디자이너 확인이 필요하다.
  */
+const inputShape =
+  'h-14 w-full rounded-2xl border px-4 text-lg leading-6 outline-none transition-colors ' +
+  'placeholder:text-cool-neutral-10 ' +
+  'disabled:border-transparent disabled:bg-cool-neutral-7 disabled:text-cool-neutral-10'
+
+/** 기본 입력 상자. hover · 포커스 · 값 채워짐 · 비활성까지 상태가 들어 있다. */
 export const inputClass =
-  'h-14 w-full rounded-2xl border border-gray-300 bg-white px-4 text-lg leading-6 ' +
-  'outline-none transition-colors placeholder:text-cool-neutral-10 focus:border-cool-neutral-50'
+  inputShape +
+  ' border-gray-300 bg-white text-cool-neutral-70 not-placeholder-shown:border-neutral-10 ' +
+  'hover:border-neutral-30 hover:bg-cool-neutral-5 focus:border-primary-50 focus:bg-white'
+
+/** 오류 상태. 값이 잘못됐을 때 inputClass 대신 쓴다. */
+export const inputErrorClass =
+  inputShape + ' border-status-red-50 bg-status-red-5 text-cool-neutral-70'
+
+/*
+ * 비밀번호 칸에 덧붙이는 마스킹 점 크기.
+ *
+ * 마스킹 문자(●)는 브라우저가 정하는 것이라 CSS 로 바꿀 수 없다. 다만 그 점이 폰트
+ * 글리프라 font-size 를 따라가고, 글리프가 em 대비 작아서 시안의 굵은 원에 맞추려면
+ * 본문(18px)보다 크게 줘야 한다.
+ *
+ * 값이 있을 때만 거는 이유는 placeholder 문구까지 30px 로 커지기 때문이다.
+ */
+export const passwordMaskClass =
+  'not-placeholder-shown:text-[30px] not-placeholder-shown:tracking-[0.12em]'
+
+/**
+ * 입력칸 바로 아래에 붙는 오류 문구 (시안 224:31092).
+ *
+ * 폼 맨 아래에 모아 두면 어느 칸이 문제인지 알 수 없다. 특히 회원가입처럼 긴 폼에서는
+ * 문구가 화면 밖 칸을 가리키게 된다. 그래서 칸마다 그 아래에 붙인다.
+ */
+export function FieldError({ children }: { children: ReactNode }) {
+  return (
+    <p role="alert" className="text-status-red-50 px-2 text-xs leading-4">
+      {children}
+    </p>
+  )
+}
+
+/**
+ * 체크박스 (시안 224:29572 — 16px, 테두리 neutral/30, 모서리 2px).
+ *
+ * 브라우저 기본 체크박스는 테두리와 모서리를 CSS 로 못 바꾼다. 운영체제가 직접 그리기
+ * 때문이다. 그래서 진짜 input 은 숨겨 두고(접근성·키보드는 그대로) 네모는 직접 그린다.
+ */
+export function Checkbox({
+  checked,
+  onChange,
+}: {
+  checked: boolean
+  onChange: (next: boolean) => void
+}) {
+  return (
+    <>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="peer sr-only"
+      />
+      {/*
+        체크 표시 색을 상자에서 물려준다(currentColor). peer-checked 는 형제에만 걸려서
+        상자 안쪽 아이콘에 직접 줄 수 없기 때문이다. 꺼져 있으면 투명이라 안 보인다.
+      */}
+      <span
+        aria-hidden
+        className="border-neutral-30 peer-focus-visible:ring-primary-40 peer-checked:border-primary-40 peer-checked:bg-primary-40 flex size-4 shrink-0 items-center justify-center rounded-[2px] border bg-white text-transparent transition-colors peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-offset-1"
+      >
+        <svg viewBox="0 0 16 16" className="size-3">
+          <path
+            d="M3.5 8.5l3 3 6-6"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </span>
+    </>
+  )
+}
 
 type FieldProps = {
   label: string

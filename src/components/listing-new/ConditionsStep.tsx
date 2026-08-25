@@ -1,6 +1,8 @@
 import { Chip, ChipGroup } from '../form/Chip'
-import { Field, inputClass } from '../form/Field'
+import { Field } from '../form/Field'
+import { TextField } from '../form/TextField'
 import { StepFooter } from './StepFooter'
+import { StepTitle } from './StepTitle'
 import type { ConditionsDraft } from './draft'
 
 const GENDER_RULES = ['성별 무관', '남성 전용', '여성 전용', '남녀 구역 분리']
@@ -50,9 +52,7 @@ export function ConditionsStep({ value, onChange, onPrev, onNext }: ConditionsSt
     <>
       <main className="flex w-full flex-1 flex-col items-center px-6 py-14">
         <div className="flex w-full max-w-[980px] flex-col gap-8">
-          <h1 className="text-[32px] leading-6 font-bold text-[#242424]">
-            숙소의 입주조건을 선택해주세요.
-          </h1>
+          <StepTitle>숙소의 입주조건을 선택해주세요.</StepTitle>
 
           <div className="flex w-full flex-col gap-6">
             <Field label="성별 구분">
@@ -98,12 +98,12 @@ export function ConditionsStep({ value, onChange, onPrev, onNext }: ConditionsSt
             </Field>
 
             <Field label="이용 연령대">
-              <input
+              <TextField
                 value={value.ageRange}
                 onChange={(event) => onChange({ ageRange: event.target.value })}
                 placeholder="예: 20~40세"
-                className={inputClass + ' font-medium'}
-              />
+                className="font-medium"
+                />
             </Field>
 
             {/* 안내 문구는 시안에 "임주자가" 로 적혀 있는데 오타로 보여 바로잡았다. */}

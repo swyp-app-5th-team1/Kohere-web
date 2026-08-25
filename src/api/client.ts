@@ -11,8 +11,14 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 const NO_AUTH_PATHS = [
   '/api/v1/auth/social-login',
   '/api/v1/auth/reissue',
-  // TODO(스펙 확정 후 수정): 이메일 로그인 경로. api/auth.ts 의 LOGIN_PATH 와 같아야 한다.
+  // TODO(스펙 확정 후 수정): 이메일 로그인 · 계정 찾기 경로.
+  // api/auth.ts 의 LOGIN_PATH · FIND_EMAIL_PATH · RESET_PASSWORD_PATH 와 같아야 한다.
   '/api/v1/auth/login',
+  '/api/v1/auth/signup',
+  '/api/v1/auth/phone/signup/verification-code',
+  '/api/v1/auth/phone/signup/verify',
+  '/api/v1/auth/find-email',
+  '/api/v1/auth/password/reset-request',
 ]
 
 const REISSUE_PATH = '/api/v1/auth/reissue'
@@ -48,6 +54,10 @@ export function setSessionExpiredHandler(handler: (() => void) | null): void {
 /**
  * 진행 중인 재발급 요청. 여러 요청이 동시에 401 을 받아도 재발급은 한 번만 돌고
  * 나머지는 이 Promise 를 같이 기다린다. (앱의 RefreshTokenManager 와 같은 역할)
+ *
+ * 성능이 아니라 **정확성** 때문에 필요하다. refresh 는 재발급마다 회전되고 이전 토큰은 즉시
+ * 무효해지는데, 다시 쓰면 서버가 탈취로 간주해 그 사용자의 모든 세션을 끊는다. 재발급이 겹쳐
+ * 돌면 두 번째가 이미 회전된 토큰을 재사용하게 되므로 반드시 한 번만 돌아야 한다.
  */
 let refreshInFlight: Promise<AuthTokens> | null = null
 
@@ -60,14 +70,24 @@ function refreshTokens(): Promise<AuthTokens> {
   return refreshInFlight
 }
 
+/**
+ * access 토큰 재발급. 웹과 앱이 같은 엔드포인트를 쓴다.
+ *
+ * 서버는 refresh 를 **쿠키 우선, 없으면 요청 본문** 순으로 읽는다. 브라우저는 HttpOnly 쿠키가
+ * 자동으로 실리므로 본문 없이 부르면 되고, 본문을 아예 보내지 않는 것은 오류가 아니다.
+ * (쿠키·본문 어느 쪽에도 값이 없을 때만 400 INVALID_INPUT)
+ *
+ * 응답 채널은 요청 채널을 따른다 — 쿠키로 보냈으니 회전된 refresh 도 Set-Cookie 로만 오고
+ * 본문의 refreshToken 은 null 이다. 그래서 여기서 refresh 를 다룰 일이 없다.
+ *
+ * 인증은 불필요하다. 만료된 access 토큰이 붙어 있어도 서버가 401 로 막지 않는다.
+ */
 async function requestReissue(): Promise<AuthTokens> {
-  const current = loadTokens()
-  if (!current) throw new Error('저장된 refresh 토큰이 없다')
-
   const response = await fetch(BASE_URL + REISSUE_PATH, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refreshToken: current.refreshToken }),
+    // refresh 쿠키를 보내고 회전된 새 쿠키를 받는 유일한 수단이다. 이게 빠지면 새 쿠키가
+    // 저장되지 않아 다음 재발급 때 이미 무효해진 토큰을 다시 쓰게 된다. (아래 주석 참고)
+    credentials: 'include',
   })
 
   const payload = (await response.json()) as BaseResponse<AuthTokens>
@@ -115,6 +135,11 @@ function sendOnce(path: string, options: RequestOptions): Promise<Response> {
 
   return fetch(BASE_URL + path, {
     method,
+    // 로그인은 refresh 쿠키를 **받고**, 재발급은 그 쿠키를 **보낸다**. 둘 다 이 옵션이 없으면
+    // 쿠키가 저장도 전송도 되지 않는다. 나머지 요청에는 영향이 없어 전역으로 켠다.
+    // 배포 환경에서 프론트·API 도메인이 다르면 서버가 Access-Control-Allow-Credentials: true 와
+    // 와일드카드가 아닌 정확한 Origin 을 내려줘야 한다.
+    credentials: 'include',
     headers: buildHeaders(path, body),
     body:
       body === undefined

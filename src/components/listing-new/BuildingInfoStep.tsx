@@ -1,7 +1,9 @@
 import { Chip, ChipGroup } from '../form/Chip'
-import { Field, inputClass } from '../form/Field'
+import { Field } from '../form/Field'
 import { PhotoPicker, type Photo } from '../form/PhotoPicker'
+import { TextField } from '../form/TextField'
 import { StepFooter } from './StepFooter'
+import { StepTitle } from './StepTitle'
 import type { BuildingDraft } from './draft'
 
 const BUILDING_TYPES = ['상가건물', '단독건물', '빌라/연립', '주상복합', '단독주택', '오피스텔']
@@ -41,7 +43,7 @@ export function BuildingInfoStep({
     <>
       <main className="flex w-full flex-1 flex-col items-center px-6 py-14">
         <div className="flex w-full max-w-[980px] flex-col gap-8">
-          <h1 className="text-[32px] leading-6 font-bold text-[#242424]">건물 정보를 입력해주세요.</h1>
+          <StepTitle>건물 정보를 입력해주세요.</StepTitle>
 
           <div className="flex w-full flex-col gap-8">
             <Field label="건물 형태">
@@ -61,22 +63,22 @@ export function BuildingInfoStep({
             <div className="flex w-full gap-[50px]">
               <div className="min-w-0 flex-1">
                 <Field label="총 층수">
-                  <input
+                  <TextField
                     value={value.totalFloors}
                     onChange={(event) => onChange({ totalFloors: event.target.value })}
                     placeholder="예: 8층"
-                    className={inputClass + ' font-medium'}
-                  />
+                    className="font-medium"
+                    />
                 </Field>
               </div>
               <div className="min-w-0 flex-1">
                 <Field label="지점 운영층">
-                  <input
+                  <TextField
                     value={value.operatingFloors}
                     onChange={(event) => onChange({ operatingFloors: event.target.value })}
                     placeholder="예: 2~4층"
-                    className={inputClass + ' font-medium'}
-                  />
+                    className="font-medium"
+                    />
                 </Field>
               </div>
             </div>

@@ -7,8 +7,8 @@
 
 const digitsOf = (raw: string, max: number) => raw.replace(/\D/g, '').slice(0, max)
 
-/** 숫자를 자릿수대로 끊어 하이픈으로 잇는다. 남은 숫자가 없으면 거기서 멈춘다. */
-const join = (digits: string, sizes: number[]) => {
+/** 숫자를 자릿수대로 끊어 구분자로 잇는다. 남은 숫자가 없으면 거기서 멈춘다. */
+const join = (digits: string, sizes: number[], separator = '-') => {
   const parts: string[] = []
   let rest = digits
 
@@ -18,7 +18,7 @@ const join = (digits: string, sizes: number[]) => {
     rest = rest.slice(size)
   }
 
-  return parts.join('-')
+  return parts.join(separator)
 }
 
 /**
@@ -42,4 +42,26 @@ export function formatPhone(raw: string): string {
 /** 사업자등록번호는 10자리 3-2-5 로 고정이다. */
 export function formatBusinessNumber(raw: string): string {
   return join(digitsOf(raw, 10), [3, 2, 5])
+}
+
+/** 생년월일은 8자리 4-2-2 로 고정이다. 시안 표기가 0000.00.00 이라 점으로 잇는다. */
+export function formatBirthDate(raw: string): string {
+  return join(digitsOf(raw, 8), [4, 2, 2], '.')
+}
+
+/**
+ * 화면의 0000.00.00 을 서버가 받는 0000-00-00 으로 바꾼다.
+ *
+ * 8자리가 안 찼거나 실제로 없는 날짜(2026.02.31 같은)면 null 이라 호출부에서 제출을 막는다.
+ * Date 는 없는 날짜를 다음 달로 넘겨 버리기 때문에, 되돌린 값이 같은지로 확인한다.
+ */
+export function birthDateToIso(value: string): string | null {
+  const digits = value.replace(/\D/g, '')
+  if (digits.length !== 8) return null
+
+  const iso = `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6)}`
+  const parsed = new Date(`${iso}T00:00:00Z`)
+
+  if (Number.isNaN(parsed.getTime())) return null
+  return parsed.toISOString().slice(0, 10) === iso ? iso : null
 }

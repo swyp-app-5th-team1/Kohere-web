@@ -1,6 +1,7 @@
 import { Chip, ChipGroup } from '../form/Chip'
 import { Field } from '../form/Field'
 import { StepFooter } from './StepFooter'
+import { StepTitle } from './StepTitle'
 
 /**
  * 시안에 그려진 순서 그대로다. "안전 시설" 과 "제공 비품" 뒤쪽에 주방 항목(토스트기 ·
@@ -78,9 +79,7 @@ export function AmenitiesStep({ value, onChange, onPrev, onNext }: AmenitiesStep
     <>
       <main className="flex w-full flex-1 flex-col items-center px-6 py-14">
         <div className="flex w-full max-w-[980px] flex-col gap-8">
-          <h1 className="text-[32px] leading-6 font-bold text-[#242424]">
-            숙소에 갖춰진 편의 시설을 선택해주세요.
-          </h1>
+          <StepTitle>숙소에 갖춰진 편의 시설을 선택해주세요.</StepTitle>
 
           <div className="flex w-full flex-col gap-6">
             {AMENITY_GROUPS.map((group) => (

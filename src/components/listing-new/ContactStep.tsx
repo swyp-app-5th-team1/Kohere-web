@@ -1,8 +1,10 @@
 import type { ReactNode } from 'react'
 import { Field, inputClass } from '../form/Field'
 import { FormattedInput } from '../form/FormattedInput'
+import { TextField } from '../form/TextField'
 import { formatBusinessNumber, formatPhone } from '../form/formatters'
 import { StepFooter } from './StepFooter'
+import { StepTitle } from './StepTitle'
 import type { ContactDraft } from './draft'
 
 type ContactStepProps = {
@@ -49,18 +51,16 @@ export function ContactStep({ value, onChange, onPrev, onNext }: ContactStepProp
     <>
       <main className="flex w-full flex-1 flex-col items-center px-6 py-14">
         <div className="flex w-full max-w-[980px] flex-col gap-8">
-          <h1 className="text-[32px] leading-6 font-bold text-[#242424]">
-            마지막으로 연락처를 확인해 주세요.
-          </h1>
+          <StepTitle>마지막으로 연락처를 확인해 주세요.</StepTitle>
 
           <div className="flex w-full flex-col gap-6">
             <Field label="지점 운영자명">
-              <input
+              <TextField
                 value={value.managerName}
                 onChange={(event) => onChange({ managerName: event.target.value })}
                 placeholder="홍길동"
-                className={inputClass + ' font-medium'}
-              />
+                className="font-medium"
+                />
             </Field>
 
             <Field label="지점 운영 휴대폰">

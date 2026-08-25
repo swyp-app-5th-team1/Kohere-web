@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { Photo } from '../form/PhotoPicker'
+import { StepTitle } from './StepTitle'
 import { SPACE_TYPES } from './spaceTypes'
 import type { ListingDraft } from './draft'
 
@@ -78,9 +79,7 @@ export function ReviewStep({ draft, photos, roomPhotos, onSaveDraft, onSubmit }:
   return (
     <main className="flex w-full flex-1 flex-col items-center px-6 py-14">
       <div className="flex w-full max-w-[980px] flex-col gap-8">
-        <h1 className="text-[32px] leading-6 font-bold text-[#242424]">
-          입력하신 내용을 확인해 주세요.
-        </h1>
+        <StepTitle>입력하신 내용을 확인해 주세요.</StepTitle>
 
         <div className="border-line-normal divide-line-normal flex w-full flex-col divide-y overflow-hidden rounded-2xl border bg-white">
           {rows.map((row) => (

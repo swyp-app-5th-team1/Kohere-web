@@ -4,7 +4,7 @@ import plusUrl from '../../assets/icon-plus-small.svg'
 export const PHOTO_MAX = 5
 
 /** 앱 목록에서 쓰는 비율. 미리보기와 크게 보기가 같은 값을 쓴다. */
-const APP_RATIO = 4 / 3
+const APP_RATIO = 16 / 9
 
 /** 업로드 API 가 없어서 브라우저 안에서만 미리보기를 만든다. url 은 objectURL 이다. */
 export type Photo = { url: string; file: File }
@@ -35,7 +35,7 @@ export function PhotoPicker({ photos, onAdd, onRemove, onMakePrimary }: PhotoPic
     <>
       <div className="flex w-full flex-wrap gap-3">
         {photos.map((photo, index) => (
-          <div key={photo.url} className="group relative h-[90px] w-[120px] shrink-0">
+          <div key={photo.url} className="group relative h-[90px] w-[160px] shrink-0">
             <button
               type="button"
               onClick={() => setPreviewIndex(index)}
@@ -46,39 +46,50 @@ export function PhotoPicker({ photos, onAdd, onRemove, onMakePrimary }: PhotoPic
             </button>
 
             {index === 0 ? (
+              /*
+               * 대표 사진에는 삭제 버튼을 두지 않는다. 사진은 최소 한 장이 있어야 하고,
+               * 대표를 지우려면 다른 사진을 대표로 올린 뒤 지우는 게 순서다.
+               */
               <span className="bg-label-normal/75 absolute top-1.5 left-1.5 rounded-md px-1.5 py-0.5 text-[10px] leading-4 font-semibold text-white">
                 대표
               </span>
             ) : (
-              <button
-                type="button"
-                onClick={() => onMakePrimary(index)}
-                className={overlayControlClass + ' bg-label-normal/75 bottom-1.5 left-1.5 rounded-md px-1.5 py-0.5 text-[10px] leading-4 font-semibold text-white'}
-              >
-                대표로 지정
-              </button>
-            )}
+              <>
+                <button
+                  type="button"
+                  onClick={() => onMakePrimary(index)}
+                  className={
+                    overlayControlClass +
+                    ' bg-label-normal/75 bottom-1.5 left-1.5 rounded-md px-1.5 py-0.5 text-[10px] leading-4 font-semibold text-white'
+                  }
+                >
+                  대표로 지정
+                </button>
 
-            <button
-              type="button"
-              onClick={() => onRemove(index)}
-              aria-label={`${index + 1}번째 사진 삭제`}
-              className={overlayControlClass + ' bg-label-normal/70 hover:bg-label-normal top-1.5 right-1.5 flex size-5 items-center justify-center rounded-full text-white'}
-            >
-              <CloseIcon />
-            </button>
+                {/* 삭제는 늘 보인다. 지우려는 사람이 사진 위를 훑어보게 만들 이유가 없다. */}
+                <button
+                  type="button"
+                  onClick={() => onRemove(index)}
+                  aria-label={`${index + 1}번째 사진 삭제`}
+                  className="bg-label-normal/70 hover:bg-label-normal absolute top-1.5 right-1.5 flex size-5 cursor-pointer items-center justify-center rounded-full text-white transition-colors"
+                >
+                  <CloseIcon />
+                </button>
+              </>
+            )}
           </div>
         ))}
 
         {photos.length < PHOTO_MAX && (
-          <label className="border-cool-neutral-8 flex h-[90px] w-[120px] shrink-0 cursor-pointer flex-col items-center justify-center rounded-[20px] border-2 border-dashed px-[18px] py-2.5">
+          <label className="border-cool-neutral-8 flex h-[90px] w-[160px] shrink-0 cursor-pointer flex-col items-center justify-center rounded-[20px] border-2 border-dashed px-[18px] py-2.5">
             <div className="flex flex-col items-center justify-center pt-1.5">
               <img src={plusUrl} alt="" className="size-4" />
               <span className="text-cool-neutral-70 text-xs leading-6 font-medium">사진 추가</span>
             </div>
             <input
               type="file"
-              accept="image/*"
+              // HEIC 같은 건 브라우저가 화면에 못 그려서 미리보기부터 깨진다. 아예 못 고르게 막는다.
+              accept="image/jpeg,image/png"
               multiple
               onChange={(event) => {
                 /*
@@ -95,8 +106,16 @@ export function PhotoPicker({ photos, onAdd, onRemove, onMakePrimary }: PhotoPic
         )}
       </div>
 
+      {/* 시안 문구는 "이미지 파일만" 인데, 형식을 JPG · PNG 로 좁혀서 문구도 맞췄다. */}
       <span className="text-cool-neutral-30 text-xs leading-6 font-medium">
-        이미지 파일만 최대 {PHOTO_MAX}장・ 4:3 비율로 잘려요
+        JPG · PNG 파일만 최대 {PHOTO_MAX}장・ 16:9 비율로 잘려요
+      </span>
+      {/*
+       * 사진은 임시 저장에 담기지 않는다. 사라진 뒤에 알리는 것보다 미리 알려 두는 편이 낫다.
+       * 업로드 API 가 생겨 사진을 고르는 즉시 올리게 되면 이 문구는 지운다.
+       */}
+      <span className="text-cool-neutral-30 text-xs leading-6 font-medium">
+        사진은 임시 저장에 담기지 않아요. 새로고침하면 다시 올려주셔야 해요
       </span>
 
       {preview && previewIndex !== null && (
@@ -212,7 +231,7 @@ function PhotoPreview({ photo, isPrimary, onClose, onRemove, onMakePrimary }: Ph
         </div>
 
         <p className="text-cool-neutral-30 text-xs leading-6 font-medium">
-          밝은 부분만 앱에 보여요. 어두운 부분은 4:3으로 잘립니다.
+          밝은 부분만 앱에 보여요. 어두운 부분은 16:9로 잘립니다.
         </p>
 
         <div className="flex w-full items-center justify-between gap-3">

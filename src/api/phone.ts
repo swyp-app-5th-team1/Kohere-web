@@ -9,6 +9,17 @@ import { ApiError, api } from './client'
 const SEND_CODE_PATH = '/api/v1/auth/phone/signup/verification-code'
 const VERIFY_PATH = '/api/v1/auth/phone/signup/verify'
 
+/*
+ * 이메일 찾기용 휴대폰 인증. 정책(6자리 · 5분 만료 · 확인 5회 · 재발송 60초)은 가입용과
+ * 똑같지만 **챌린지와 마커의 키스페이스가 다르다.** 가입용 마커로 이메일 찾기를 부르면
+ * 422 고 그 반대도 마찬가지라, 아래 두 경로를 위 두 개와 섞어 쓰면 안 된다.
+ *
+ * 레이트리밋 예산도 가입용과 합산하지 않는다 — 가입 문자를 다 태워 막힌 사람이 복구
+ * 경로까지 막히지 않게 한 것이다.
+ */
+const FIND_EMAIL_SEND_CODE_PATH = '/api/v1/auth/phone/find-email/verification-code'
+const FIND_EMAIL_VERIFY_PATH = '/api/v1/auth/phone/find-email/verify'
+
 /** 인증번호 정책. 서버가 정한 값이라 화면 표시도 여기에 맞춘다. */
 export const PHONE_CODE_LENGTH = 6
 /** 재발송 간격. 이보다 빨리 다시 부르면 429 다. */
@@ -49,6 +60,36 @@ export function sendSignupPhoneCode(phone: string): Promise<SendCodeResult> {
  */
 export function verifySignupPhoneCode(phone: string, code: string): Promise<VerifyPhoneResult> {
   return api.post<VerifyPhoneResult>(VERIFY_PATH, {
+    phoneNumber: digitsOnly(phone),
+    code,
+  })
+}
+
+/**
+ * 이메일 찾기용 SMS 인증번호를 발송한다.
+ *
+ * 가입용과 마찬가지로 **가입 이력이 있는 번호든 없는 번호든 응답이 같다.** 계정이 있는지
+ * 여기서 알려 주면 발송 한 번으로 번호를 열거할 수 있게 된다. 계정 판정은 이름까지 받는
+ * `/auth/email/find` 에서만 일어난다.
+ */
+export function sendFindEmailPhoneCode(phone: string): Promise<SendCodeResult> {
+  return api.post<SendCodeResult>(FIND_EMAIL_SEND_CODE_PATH, { phoneNumber: digitsOnly(phone) })
+}
+
+/**
+ * 인증번호를 확인해 이메일 찾기 전용 마커를 만든다.
+ *
+ * 마커는 30분 유효하고 소비처는 `/auth/email/find` 하나뿐이다. 넘기면 그쪽에서 422 가
+ * 나고 발송부터 다시 해야 한다.
+ *
+ * 성공 응답도 **계정의 유무는 말하지 않는다** — 「번호를 검증했다」는 사실만 담긴다.
+ * 여기서 미리 알려 주면 발송 · 확인 두 번만으로 번호 열거가 성립한다.
+ */
+export function verifyFindEmailPhoneCode(
+  phone: string,
+  code: string,
+): Promise<VerifyPhoneResult> {
+  return api.post<VerifyPhoneResult>(FIND_EMAIL_VERIFY_PATH, {
     phoneNumber: digitsOnly(phone),
     code,
   })

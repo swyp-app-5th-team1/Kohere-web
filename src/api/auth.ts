@@ -38,15 +38,42 @@ export async function login(
 }
 
 /**
+ * 로그인 실패에 실려 오는 시도 횟수 (401 AUTH_INVALID_CREDENTIALS 전용).
+ *
+ * 비밀번호가 틀린 경우에만 실린다. 미등록 이메일이나 시도 한도 초과처럼 다른 이유로
+ * 401 이 나면 details 자체가 없어서 여기서 undefined 가 나온다 — 그래서 이 값의 유무가
+ * 곧 「이 계정은 실재한다」는 신호이기도 하다. 화면 문구를 이걸로 갈라서는 안 된다.
+ */
+export type LoginAttempts = {
+  /** 지금까지 누적된 연속 실패 횟수. */
+  failed: number
+  /** 잠기는 기준. 시안 기준 10 이다. */
+  max: number
+}
+
+export function loginAttempts(error: unknown): LoginAttempts | null {
+  if (!(error instanceof ApiError)) return null
+  const failed = error.detailNumber('failedAttempts')
+  const max = error.detailNumber('maxFailedAttempts')
+  return failed === undefined || max === undefined ? null : { failed, max }
+}
+
+/**
+ * 이번 실패로 계정이 잠겼는지.
+ *
+ * 스펙 주의사항에 적힌 대로, failedAttempts 가 maxFailedAttempts 에 닿은 응답이 곧
+ * 잠금 시점이다. 그 응답의 상태 코드는 아직 401 이고 423 은 그 다음 시도부터 나온다.
+ * 그래서 401 인데도 잠금 팝업을 띄워야 하는 순간이 존재한다.
+ */
+export function isLockedByThisAttempt(error: unknown): boolean {
+  const attempts = loginAttempts(error)
+  return attempts !== null && attempts.failed >= attempts.max
+}
+
+/**
  * 로그인 실패를 화면에 보여줄 한글 문구로 바꾼다.
  *
  * 서버 message 는 영문이라 그대로 뿌릴 수 없고, 분기는 반드시 error.code 로 한다.
- *
- * TODO(백엔드 확인 후 수정): 시안에는 "로그인 N회 실패" 모달이 있는데 401 응답에 남은 시도
- * 횟수가 없어서 지금은 N 을 표시할 수 없다. 또 API 는 5회 연속 실패로 잠기는 반면 시안 문구는
- * 10회 기준이라(rate limit 의 '이메일 10회/시간' 과 혼동된 것으로 보인다) 서버가 10회로
- * 맞추기로 했다. 두 가지가 정리되면 아래 문구와 호출부만 고치면 된다 —
- * 그래서 잠금 문구에는 횟수를 넣지 않았다.
  */
 export function loginErrorMessage(error: unknown): string {
   if (!(error instanceof ApiError)) {
@@ -62,10 +89,11 @@ export function loginErrorMessage(error: unknown): string {
     case 'AUTH_INVALID_CREDENTIALS':
       return '이메일 또는 비밀번호가 올바르지 않습니다.'
 
-    // 시간이 지나도 자동으로 풀리지 않는다. 해제는 운영자만 할 수 있다.
+    // 시간이 지나도 자동으로 풀리지 않는다. 본인이 재설정을 완주하는 것만이 해제다.
     case 'AUTH_ACCOUNT_LOCKED':
-      return '비밀번호를 여러 번 잘못 입력해 계정이 잠겼습니다. 고객센터로 문의해 주세요.'
+      return '비밀번호를 여러 번 잘못 입력해 계정이 잠겼습니다. 비밀번호를 재설정해 주세요.'
 
+    // 이메일이 있든 없든 자격증명 조회 전에 걸리므로, 어느 축에 걸렸는지 알려주지 않는다.
     case 'TOO_MANY_REQUESTS':
       return '로그인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.'
 
@@ -156,6 +184,25 @@ export function emailDomainError(domain: string): string | null {
   return null
 }
 
+/**
+ * 「보내볼 만한 주소인가」만 보는 최소 관문.
+ *
+ * 형식을 정밀하게 따지지 않는 이유는, 이 값의 진짜 판정을 메일 발송이 하기 때문이다.
+ * 정규식은 「그럴듯하다」까지만 증명하고 메일 도착은 「실재하고 본인이 연다」를 증명하니,
+ * 앞엣것을 조일수록 멀쩡한 주소만 막힌다. 그래서 버튼을 켤지 말지에만 쓴다.
+ */
+export function isEmailShaped(email: string): boolean {
+  const at = email.indexOf('@')
+  if (at <= 0 || at !== email.lastIndexOf('@')) return false
+  const domain = email.slice(at + 1)
+  return (
+    domain.length > 2 &&
+    domain.includes('.') &&
+    !domain.startsWith('.') &&
+    !domain.endsWith('.')
+  )
+}
+
 /** 이름은 성과 이름을 합쳐 한 칸에 받는다. 서버 제한이 200자다. */
 export function nameFormatError(name: string): string | null {
   if (name.trim() === '') return '이름을 입력해 주세요.'
@@ -241,44 +288,157 @@ export async function logout(): Promise<void> {
   }
 }
 
-/**
- * TODO(스펙 확정 후 수정): 계정 찾기 엔드포인트. 둘 다 서버에 아직 없다.
- * client.ts 의 NO_AUTH_PATHS 에도 같은 경로가 들어 있으니 함께 수정한다.
- */
-const FIND_EMAIL_PATH = '/api/v1/auth/find-email'
-const RESET_PASSWORD_PATH = '/api/v1/auth/password/reset-request'
+/** 가입 이메일 찾기. client.ts 의 NO_AUTH_PATHS 에도 같은 경로가 들어 있다. */
+const FIND_EMAIL_PATH = '/api/v1/auth/email/find'
 
-/** 서버 형식이 정해지기 전까지는 하이픈을 빼고 숫자만 보낸다. */
+/*
+ * 비밀번호 재설정 두 단계. 경로는 로그인 스펙의 잠금 해제 안내에 적힌 것을 그대로 쓴다
+ * ("해제는 본인이 reset-link → reset 을 완주하는 것").
+ *
+ * TODO(스펙 확정 후 수정): 두 경로의 요청 본문 스펙은 아직 못 봤다. 아래 필드 이름은
+ * 로그인 · 회원가입 스펙의 작명(email, password)을 따라 짐작한 것이라 확인이 필요하다.
+ */
+const RESET_LINK_PATH = '/api/v1/auth/password/reset-link'
+const RESET_PASSWORD_PATH = '/api/v1/auth/password/reset'
+
+/** 하이픈은 서버가 알아서 정규화하지만, 보낼 때 숫자만 남겨 두면 헷갈릴 일이 없다. */
 const digitsOnly = (phone: string) => phone.replace(/\D/g, '')
 
 export type FindEmailResponse = {
   /**
-   * 가려진 이메일 (`ko****@gmail.com`).
+   * 웹 로그인 ID(`local_accounts.email`)를 서버가 가린 값 (`ki***@work.com`).
    *
-   * 마스킹은 반드시 **서버에서** 한다. 이름과 전화번호만 알면 로그인 없이 부를 수 있는
-   * 경로라, 원본 이메일을 내려주고 화면에서 가리면 가리는 의미가 사라진다.
-   * (시안 메모 「5. 아이디 찾기 결과 마스킹 규칙」— 가리는 정도는 디자이너 · 서버 확정 필요)
+   * 회원 프로필 이메일이 아니다 — 앱 소셜 계정과 연동된 임대인은 두 값이 다를 수 있고,
+   * 이 화면이 알려 줘야 하는 건 로그인 칸에 칠 ID 쪽이다.
+   *
+   * 마스킹은 서버가 한다. 원본을 내려주고 화면에서 가리면 가리는 의미가 없다.
    */
-  maskedEmail: string
+  email: string
 }
 
-/** 이름 · 전화번호로 가입한 이메일을 가려진 형태로 돌려받는다. */
+/**
+ * 전화번호 · 이름으로 가입한 웹 로그인 ID 를 가려진 형태로 돌려받는다.
+ *
+ * 부르기 전에 **이메일 찾기 전용** 문자 인증을 마쳐야 한다. 회원가입용 마커로는 통과하지
+ * 못하고 422 가 난다.
+ *
+ * 성공하면 서버가 그 마커를 소비(삭제)한다. 마커 하나로 번호를 바꿔 가며 무한히 조회하는
+ * 걸 막기 위해서다 — 그래서 한 번 찾고 나면 다시 찾으려면 인증부터 새로 해야 한다.
+ * 반대로 404(못 찾음)는 마커를 태우지 않아 이름만 고쳐 곧바로 다시 시도할 수 있다.
+ *
+ * 이름은 가입 폼에 적은 값과 대조한다. 서버가 공백을 모두 지우고 대소문자를 무시해
+ * 비교하므로 「홍 길동」과 「홍길동」은 같은 이름이다.
+ */
 export function findEmail(name: string, phone: string): Promise<FindEmailResponse> {
   return api.post<FindEmailResponse>(FIND_EMAIL_PATH, {
-    name,
     phoneNumber: digitsOnly(phone),
+    name,
   })
 }
 
-/** 비밀번호 재설정 메일 발송을 요청한다. 본인 확인용으로 이름 · 전화번호를 함께 보낸다. */
-export function requestPasswordReset(
-  name: string,
-  email: string,
-  phone: string,
-): Promise<void> {
-  return api.post(RESET_PASSWORD_PATH, {
-    name,
-    email,
-    phoneNumber: digitsOnly(phone),
-  })
+/** 이메일 찾기 실패를 화면 문구로 바꾼다. 404 는 팝업이 따로 있어 여기서 다루지 않는다. */
+export function findEmailErrorMessage(error: unknown): string {
+  if (!(error instanceof ApiError)) {
+    return '요청 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.'
+  }
+
+  switch (error.code) {
+    /*
+     * 인증을 안 했거나, 만료됐거나, 이미 한 번 찾는 데 써 버린 마커다. 서버가 셋을
+     * 구분해 주지 않으므로 원인을 단정하지 않고 다시 받으라고만 안내한다.
+     */
+    case 'AUTH_PHONE_NOT_VERIFIED':
+      return '휴대폰 인증이 만료되었습니다. 인증번호를 다시 받아 주세요.'
+
+    case 'INVALID_INPUT':
+      return error.fieldErrors[0]?.reason ?? '입력한 내용을 다시 확인해 주세요.'
+
+    default:
+      return '요청 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.'
+  }
+}
+
+export type ResetLinkResult = {
+  /** 링크가 살아 있는 초 (1800 = 30분). 가입되지 않은 주소에도 같은 값이 온다. */
+  expiresIn: number
+}
+
+/**
+ * 비밀번호 재설정 링크 발송을 요청한다.
+ *
+ * 「비밀번호를 잊었다」와 「계정이 잠겼다(423)」의 진입점이 같다 — 화면은 둘이지만 API 는
+ * 하나이고, 잠금만 푸는 엔드포인트는 따로 없다.
+ *
+ * 이름 · 연락처 같은 확인 값을 받지 않는다. 소유 증명은 **메일 수신 자체**가 한다.
+ * 조회 대상은 웹 로그인 ID(`local_accounts.email`) 하나뿐이고 회원 프로필 이메일은 보지
+ * 않는다 — 앱 소셜 계정과 연동된 임대인도 웹에 적은 주소로 링크를 받는다.
+ *
+ * 가입되지 않은 주소에도 **`expiresIn` 까지 똑같은 200** 이 온다(메일만 안 간다).
+ * 선행 게이트가 없어 아무 주소로나 부를 수 있어서, 응답을 가르는 순간 완전한 가입 여부
+ * 조회기가 되기 때문이다. 그러니 화면 문구도 절대 갈라서는 안 된다.
+ */
+export function requestPasswordResetLink(email: string): Promise<ResetLinkResult> {
+  return api.post<ResetLinkResult>(RESET_LINK_PATH, { email })
+}
+
+/** 재설정 링크 발송 실패 문구. */
+export function resetLinkErrorMessage(error: unknown): string {
+  if (!(error instanceof ApiError)) {
+    return '메일을 보내지 못했습니다. 잠시 후 다시 시도해 주세요.'
+  }
+
+  switch (error.code) {
+    case 'INVALID_INPUT':
+      return error.fieldErrors[0]?.reason ?? '이메일 주소를 다시 확인해 주세요.'
+
+    // 같은 이메일 5회/시간 · 같은 IP 20회/시간이 한 코드로 온다. 로그인 시도 한도와는
+    // 버킷을 공유하지 않는다. 어느 축인지 서버가 알려주지 않으므로 문구도 짚지 않는다.
+    case 'TOO_MANY_REQUESTS':
+      return '요청이 너무 잦습니다. 잠시 후 다시 시도해 주세요.'
+
+    case 'UPSTREAM_ERROR':
+      return '메일 발송에 실패했습니다. 잠시 후 다시 시도해 주세요.'
+
+    default:
+      return '메일을 보내지 못했습니다. 잠시 후 다시 시도해 주세요.'
+  }
+}
+
+/**
+ * 메일로 받은 링크를 타고 들어와 새 비밀번호를 확정한다 (시안 224:30754).
+ *
+ * **이 호출 하나가 계정 잠금 해제까지 겸한다** — 토큰 소비 · 비밀번호 교체 · 잠금 해제 ·
+ * 실패 카운터 초기화 · 기존 세션 전량 무효화가 한 번에 일어난다.
+ *
+ * 204 다. 본문도 `Set-Cookie` 도 없다 — 재설정은 세션을 만드는 자리가 아니다. 방금 전량
+ * 무효화한 자리에 새 세션을 껴 넣으면 유출된 링크를 주운 쪽이 그대로 로그인 상태가 된다.
+ * 그래서 성공하면 로그인 화면으로 보낸다.
+ *
+ * 성공하면 토큰은 그 자리에서 죽는다. 같은 링크를 두 번 제출하면 두 번째는 422 다.
+ * 반대로 비밀번호 정책 위반(400)에서는 토큰이 소비되지 않아 다시 시도할 수 있다.
+ */
+export function resetPassword(token: string, newPassword: string): Promise<void> {
+  return api.post(RESET_PASSWORD_PATH, { token, newPassword })
+}
+
+/** 재설정 확정 실패 문구. 비밀번호 칸에 붙일 사유는 따로 꺼내 쓴다. */
+export function resetPasswordErrorMessage(error: unknown): string {
+  if (!(error instanceof ApiError)) {
+    return '비밀번호를 바꾸지 못했습니다. 잠시 후 다시 시도해 주세요.'
+  }
+
+  switch (error.code) {
+    /*
+     * 토큰이 없거나 만료됐거나 이미 쓴 링크다. 이 판정이 첫 단계라 비밀번호 · 잠금 ·
+     * 세션 어느 것도 건드리지 않은 상태이므로, 링크를 새로 받으라고만 안내하면 된다.
+     */
+    case 'AUTH_PASSWORD_RESET_TOKEN_INVALID':
+      return '링크가 만료되었거나 이미 사용되었습니다. 재설정 링크를 다시 받아 주세요.'
+
+    case 'INVALID_INPUT':
+      return error.fieldErrors[0]?.reason ?? '입력한 내용을 다시 확인해 주세요.'
+
+    default:
+      return '비밀번호를 바꾸지 못했습니다. 잠시 후 다시 시도해 주세요.'
+  }
 }

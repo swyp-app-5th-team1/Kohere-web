@@ -12,6 +12,14 @@ export type ApiErrorBody = {
   code: string
   message: string
   errors: ApiFieldError[]
+  /**
+   * 코드별 부가 데이터. 값이 없으면 null 이 아니라 필드 자체가 빠진다.
+   *
+   * 지금 쓰는 곳은 로그인 401 하나뿐이다 — 비밀번호가 틀린 경우에만
+   * failedAttempts · maxFailedAttempts 가 실린다. 미등록 이메일이나 시도 한도 초과처럼
+   * 다른 이유로 401 이 나면 이 필드가 없다.
+   */
+  details?: Record<string, unknown>
 }
 
 /** 폼 검증 실패 시 어떤 필드가 왜 틀렸는지. 등록 폼에서 필드별 에러 표시에 쓴다. */

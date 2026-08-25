@@ -6,16 +6,29 @@ type ModalProps = {
   onClose: () => void
   /** 스크린 리더가 읽을 제목. 화면에 보이는 제목과 같은 문구를 넣는다. */
   label: string
+  /**
+   * 안쪽 내용 기둥의 최대 너비.
+   *
+   * 카드는 어느 팝업이나 577px 인데 내용 너비는 시안마다 다르다. 「이메일 검색 결과」
+   * (224:30671)는 377, 「비밀번호 재설정」(224:30728)은 425 다. 그래서 카드는 고정해
+   * 두고 이 값만 바꾼다.
+   */
+  contentWidth?: string
   children: ReactNode
 }
 
 /**
- * 화면 가운데 뜨는 팝업. 시안의 카드(모서리 24 · 위아래 56 · 좌우 100 · 그림자)를 따른다.
+ * 화면 가운데 뜨는 팝업. 시안의 카드(너비 577 · 모서리 24 · 위아래 56 · 그림자)를 따른다.
  *
  * 배경을 누르거나 ESC 를 눌러 닫는다. 열려 있는 동안은 뒤 화면이 스크롤되지 않게 막는다.
- * 좌우 여백 100px 은 좁은 화면에서 내용이 뭉개져서 md 부터만 적용한다.
  */
-export function Modal({ open, onClose, label, children }: ModalProps) {
+export function Modal({
+  open,
+  onClose,
+  label,
+  contentWidth = 'max-w-[425px]',
+  children,
+}: ModalProps) {
   useEffect(() => {
     if (!open) return
 
@@ -47,9 +60,11 @@ export function Modal({ open, onClose, label, children }: ModalProps) {
         role="dialog"
         aria-modal="true"
         aria-label={label}
-        className="flex w-full max-w-[625px] flex-col items-center gap-12 rounded-3xl bg-white px-6 py-14 shadow-[0_16px_72px_0_rgba(23,23,23,0.16)] md:px-[100px]"
+        className="flex w-full max-w-[577px] flex-col items-center rounded-3xl bg-white px-6 py-14 shadow-[0_16px_72px_0_rgba(23,23,23,0.16)]"
       >
-        {children}
+        <div className={'flex w-full flex-col items-center gap-12 ' + contentWidth}>
+          {children}
+        </div>
       </div>
     </div>,
     document.body,

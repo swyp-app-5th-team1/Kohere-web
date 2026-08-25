@@ -17,8 +17,17 @@ const NO_AUTH_PATHS = [
   '/api/v1/auth/signup',
   '/api/v1/auth/phone/signup/verification-code',
   '/api/v1/auth/phone/signup/verify',
-  '/api/v1/auth/find-email',
-  '/api/v1/auth/password/reset-request',
+  '/api/v1/auth/email/find',
+  /*
+   * 이메일 찾기 전용 문자 인증. 회원가입용(phone/signup/*)과 경로가 다르고, 서버도 두
+   * 마커를 구분한다 — 가입용으로 이메일을 찾으려 하면 422 다.
+   *
+   * TODO(스펙 확정 후 연결): 요청 · 응답 형태를 아직 못 봐서 phone.ts 에 함수가 없다.
+   */
+  '/api/v1/auth/phone/find-email/verification-code',
+  '/api/v1/auth/phone/find-email/verify',
+  '/api/v1/auth/password/reset-link',
+  '/api/v1/auth/password/reset',
 ]
 
 const REISSUE_PATH = '/api/v1/auth/reissue'
@@ -29,18 +38,28 @@ export class ApiError extends Error {
   readonly status: number
   /** 폼 검증 실패 시 필드별 사유. 등록 폼에서 각 입력칸 아래 표시하는 데 쓴다. */
   readonly fieldErrors: ApiFieldError[]
+  /** 코드별 부가 데이터. 값이 없는 응답에서는 필드 자체가 빠지므로 비어 있을 수 있다. */
+  readonly details: Record<string, unknown>
 
   constructor(
     code: string,
     message: string,
     status: number,
     fieldErrors: ApiFieldError[] = [],
+    details: Record<string, unknown> = {},
   ) {
     super(message)
     this.name = 'ApiError'
     this.code = code
     this.status = status
     this.fieldErrors = fieldErrors
+    this.details = details
+  }
+
+  /** details 에서 숫자 하나를 꺼낸다. 없거나 숫자가 아니면 undefined 다. */
+  detailNumber(key: string): number | undefined {
+    const value = this.details[key]
+    return typeof value === 'number' ? value : undefined
   }
 }
 
@@ -176,6 +195,7 @@ async function unwrap<T>(response: Response): Promise<T> {
       payload?.error?.message ?? `요청에 실패했습니다. (HTTP ${response.status})`,
       response.status,
       payload?.error?.errors ?? [],
+      payload?.error?.details ?? {},
     )
   }
 

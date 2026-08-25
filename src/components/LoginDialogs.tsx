@@ -1,28 +1,42 @@
 import { useState } from 'react'
+import { isEmailShaped, requestPasswordResetLink, resetLinkErrorMessage } from '../api/auth'
 import { Modal, ModalHeading } from './Modal'
-import { inputClass } from './form/Field'
+import { ctaDisabledClass, ctaPrimaryClass } from './form/CtaButton'
+import { TextField } from './form/TextField'
 
 /*
- * 시안에는 "로그인 8회 실패", "10회 실패하여 계정이 잠겼습니다" 처럼 횟수가 적혀 있다.
- * 그런데 서버가 남은 시도 횟수를 응답에 내려주지 않고, 잠금 기준도 5회에서 10회로
- * 바꾸기로 한 상태라 아직 확정이 아니다. 그래서 숫자를 빼고 문구만 남겼다.
- * 서버가 횟수를 내려주기 시작하면 이 두 파일의 문구만 고치면 된다.
+ * 로그인 실패 팝업 두 개 (시안 224:30719 · 224:30728).
+ *
+ * 시안이 「로그인 8회 실패」, 「10회 실패하여 계정이 잠겼습니다」처럼 횟수를 글자로 박아
+ * 두었는데, 이제 서버가 401 응답에 failedAttempts · maxFailedAttempts 를 실어 준다.
+ * 다만 비밀번호가 틀린 경우에만 실리므로(미등록 이메일 · 시도 한도 초과에는 없다)
+ * 숫자가 없는 경우도 항상 함께 그린다.
  */
 
-const confirmButtonClass =
-  'border-line-normal bg-label-normal flex h-12 w-full items-center justify-center rounded-2xl ' +
-  'border px-3 text-base leading-6 font-semibold text-white transition hover:brightness-125'
-
 /** 401 AUTH_INVALID_CREDENTIALS — 이메일이 없거나 비밀번호가 틀렸을 때. */
-export function LoginFailedDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function LoginFailedDialog({
+  open,
+  onClose,
+  failedCount,
+  maxCount,
+}: {
+  open: boolean
+  onClose: () => void
+  /** 누적 실패 횟수. 숫자가 안 오는 실패도 있어 없을 수 있다. */
+  failedCount?: number
+  /** 잠기는 기준. 시안은 10 이지만 값은 서버가 정한다. */
+  maxCount?: number
+}) {
+  const title = failedCount === undefined ? '로그인 실패' : `로그인 ${failedCount}회 실패`
+
   return (
-    <Modal open={open} onClose={onClose} label="로그인 실패">
-      <ModalHeading title="로그인 실패">
-        <p>여러 번 실패하면 계정이 잠금 상태로 설정되고</p>
-        <p>이메일을 통해 비밀번호를 재설정해야 합니다.</p>
+    <Modal open={open} onClose={onClose} label={title}>
+      <ModalHeading title={title}>
+        <p>{maxCount === undefined ? '여러 번' : `${maxCount}회`} 실패시 계정이 잠금 상태로</p>
+        <p>설정되고 이메일을 통해 비밀번호를 재설정 해야합니다.</p>
       </ModalHeading>
 
-      <button type="button" onClick={onClose} className={confirmButtonClass}>
+      <button type="button" onClick={onClose} className={`${ctaPrimaryClass} w-full`}>
         확인
       </button>
     </Modal>
@@ -34,44 +48,101 @@ type AccountLockedDialogProps = {
   onClose: () => void
   /** 로그인 화면에서 입력했던 이메일. 다시 치지 않도록 채워 준다. */
   defaultEmail?: string
+  /** 잠기는 기준 횟수. 없으면 숫자를 뺀 문구로 대신한다. */
+  maxCount?: number
 }
 
-/** 423 AUTH_ACCOUNT_LOCKED — 연속 실패로 잠긴 계정. 운영자만 풀 수 있어 재설정으로 안내한다. */
+/**
+ * 423 AUTH_ACCOUNT_LOCKED — 연속 실패로 잠긴 계정.
+ *
+ * 시간이 지나도 풀리지 않고, 본인이 재설정 링크를 받아 새 비밀번호를 확정하는 것만이
+ * 유일한 해제다. 그래서 이 팝업은 안내가 아니라 실제 출구다.
+ *
+ * 401 인데 이 팝업을 띄워야 하는 경우가 있다 — failedAttempts 가 상한에 닿은 그 응답이
+ * 곧 잠금 시점이라 상태 코드는 아직 401 이다. 판단은 LoginPage 가 한다.
+ */
 export function AccountLockedDialog({
   open,
   onClose,
   defaultEmail = '',
+  maxCount,
 }: AccountLockedDialogProps) {
   const [email, setEmail] = useState(defaultEmail)
+  const [sending, setSending] = useState(false)
+  const [sent, setSent] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const canSend = isEmailShaped(email.trim()) && !sending && !sent
+
+  async function handleSend() {
+    if (!canSend) return
+    setSending(true)
+    setError(null)
+    try {
+      await requestPasswordResetLink(email.trim())
+      setSent(true)
+    } catch (caught) {
+      setError(resetLinkErrorMessage(caught))
+    } finally {
+      setSending(false)
+    }
+  }
 
   return (
     <Modal open={open} onClose={onClose} label="비밀번호 재설정">
       <div className="flex w-full flex-col items-center gap-4 text-center">
         <ModalHeading title="비밀번호 재설정">
-          <p>로그인에 여러 번 실패하여 계정이 잠겼습니다.</p>
+          <p>
+            로그인을 {maxCount === undefined ? '여러 번' : `${maxCount}회`} 실패하여 계정이
+            잠겼습니다.
+          </p>
           <p>이메일로 비밀번호 재설정 링크가 발송됩니다.</p>
         </ModalHeading>
 
-        <input
-          type="email"
+        <TextField
+          inputMode="email"
+          autoComplete="email"
           aria-label="이메일"
           placeholder="이메일"
           value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          className={`${inputClass} font-medium`}
+          onChange={(event) => {
+            setEmail(event.target.value)
+            setSent(false)
+          }}
+          onClear={() => setEmail('')}
+          className="font-medium"
         />
+
+        {/*
+         * 보냈다는 사실만 알리고 「가입된 주소인지」는 말하지 않는다. 로그인이 미등록
+         * 이메일과 비밀번호 불일치를 같은 401 로 묶어 둔 걸 여기서 되돌리면 안 된다.
+         */}
+        {sent && (
+          <p role="status" className="text-cool-neutral-70 text-sm leading-5">
+            메일을 보냈습니다. 보이지 않으면 스팸함을 확인해 주세요.
+          </p>
+        )}
+        {error && (
+          <p role="alert" className="text-sm leading-5 text-red-600">
+            {error}
+          </p>
+        )}
       </div>
 
       {/*
-       * TODO(API 나오면 연결): 비밀번호 재설정 링크 발송. 서버에 아직 경로가 없어서
-       * 누를 수 없게 두었다. 시안도 비활성(회색) 상태로 그려져 있다.
+       * 시안은 비활성(회색)으로 그려져 있다. 주소가 채워지면 활성으로 바뀐다.
+       *
+       * 라벨은 시안(224:30737)의 「인증번호 발송」 대신 하는 일을 적었다. 바로 위 본문이
+       * 「재설정 링크가 발송됩니다」인데 버튼만 인증번호라고 하면 같은 팝업 안에서 두 말을
+       * 하게 된다. 메일 본문 시안(224:30738)도 번호가 아니라 링크 버튼이다.
        */}
       <button
         type="button"
-        disabled
-        className="border-line-alternative bg-cool-neutral-20 flex h-12 w-full cursor-not-allowed items-center justify-center rounded-2xl border px-3 text-base leading-6 font-semibold text-white"
+        onClick={handleSend}
+        disabled={!canSend}
+        className={(canSend ? ctaPrimaryClass : ctaDisabledClass) + ' w-full'}
       >
-        인증번호 발송
+        {sent ? '발송 완료' : sending ? '발송 중…' : '재설정 링크 발송'}
       </button>
     </Modal>
   )

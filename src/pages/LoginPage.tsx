@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { login, loginErrorMessage } from '../api/auth'
+import { isLockedByThisAttempt, login, loginAttempts, loginErrorMessage } from '../api/auth'
+import type { LoginAttempts } from '../api/auth'
 import { ApiError } from '../api/client'
 import { KohereLogo } from '../components/KohereLogo'
 import { AccountLockedDialog, LoginFailedDialog } from '../components/LoginDialogs'
@@ -25,6 +26,8 @@ export default function LoginPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [dialog, setDialog] = useState<Dialog>(null)
   const [passwordShown, setPasswordShown] = useState(false)
+  /** 401 에 실려 온 실패 횟수. 팝업 문구의 숫자로만 쓴다. */
+  const [attempts, setAttempts] = useState<LoginAttempts | null>(null)
 
   // 시안의 로그인 버튼은 회색(비활성) 상태로 그려져 있다. 두 칸이 모두 채워지면 활성화한다.
   const canSubmit = email.trim() !== '' && password !== '' && !submitting
@@ -52,9 +55,15 @@ export default function LoginPage() {
       navigate(from ?? '/listings', { replace: true })
     } catch (error) {
       const code = error instanceof ApiError ? error.code : null
+      setAttempts(loginAttempts(error))
 
-      // 잠금과 자격증명 오류는 시안에 팝업이 있다. 입력값 오류·시도 초과는 문구로만 알린다.
-      if (code === 'AUTH_ACCOUNT_LOCKED') setDialog('locked')
+      /*
+       * 잠금과 자격증명 오류는 시안에 팝업이 있다. 입력값 오류 · 시도 초과는 문구로만 알린다.
+       *
+       * 마지막 실패는 상태 코드가 아직 401 이라 code 만 보면 놓친다 — 실패 횟수가 상한에
+       * 닿았으면 그 응답이 곧 잠금이므로 잠금 팝업으로 보낸다.
+       */
+      if (code === 'AUTH_ACCOUNT_LOCKED' || isLockedByThisAttempt(error)) setDialog('locked')
       else if (code === 'AUTH_INVALID_CREDENTIALS') setDialog('failed')
       else setErrorMessage(loginErrorMessage(error))
     } finally {
@@ -145,12 +154,22 @@ export default function LoginPage() {
         </form>
       </div>
 
-      <LoginFailedDialog open={dialog === 'failed'} onClose={() => setDialog(null)} />
+      <LoginFailedDialog
+        open={dialog === 'failed'}
+        onClose={() => setDialog(null)}
+        failedCount={attempts?.failed}
+        maxCount={attempts?.max}
+      />
 
       {/* 열릴 때 붙여야 안에 있는 이메일 칸이 지금 입력값으로 채워진다. 계속 붙여 두면
           맨 처음 마운트될 때의 빈 값이 그대로 남는다. */}
       {dialog === 'locked' && (
-        <AccountLockedDialog open onClose={() => setDialog(null)} defaultEmail={email} />
+        <AccountLockedDialog
+          open
+          onClose={() => setDialog(null)}
+          defaultEmail={email}
+          maxCount={attempts?.max}
+        />
       )}
     </div>
   )

@@ -2,8 +2,8 @@ import { clearTokens, loadTokens, saveTokens } from './tokens'
 import type { ApiFieldError, AuthTokens, BaseResponse } from './types'
 
 /**
- * 개발 중에는 빈 문자열이라 `/api/...` 상대주소로 나가고, Vite 프록시가 dev 서버로 중계한다.
- * 배포본에서는 .env.production 의 절대주소가 채워진다.
+ * 두 환경 모두 빈 문자열이라 `/api/...` 상대주소로 나간다. 개발 중에는 Vite 프록시가
+ * dev 서버로 중계하고, 배포본은 백엔드와 같은 오리진에서 서빙돼 Caddy 가 백엔드로 넘긴다.
  */
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 

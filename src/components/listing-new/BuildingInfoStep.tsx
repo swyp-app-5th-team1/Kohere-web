@@ -1,10 +1,11 @@
 import { Chip, ChipGroup } from '../form/Chip'
-import { Field } from '../form/Field'
+import { Field, FieldError } from '../form/Field'
 import { PhotoPicker, type Photo } from '../form/PhotoPicker'
 import { TextField } from '../form/TextField'
 import { StepFooter } from './StepFooter'
 import { StepTitle } from './StepTitle'
 import { BUILDING_TYPES } from './buildingTypes'
+import { floorCountError, floorSpanError, parseCount } from './ranges'
 import type { BuildingDraft } from './draft'
 
 type BuildingInfoStepProps = {
@@ -34,7 +35,13 @@ export function BuildingInfoStep({
   onPrev,
   onNext,
 }: BuildingInfoStepProps) {
+  /* 서버가 400 을 내는 조건을 미리 본다 — ranges.ts 의 형식 규칙을 그대로 쓴다. */
+  const totalFloorsError = floorCountError(value.totalFloors)
+  const floorRangeError = floorSpanError(value.operatingFloors, parseCount(value.totalFloors))
+
   const filled =
+    totalFloorsError === null &&
+    floorRangeError === null &&
     value.buildingType !== '' &&
     value.totalFloors.trim() !== '' &&
     value.operatingFloors.trim() !== '' &&
@@ -65,24 +72,39 @@ export function BuildingInfoStep({
             </Field>
 
             <div className="flex w-full gap-[50px]">
+              {/*
+                시안 예시대로 「8층」이라 적어도 되고, 보낼 때만 「층」을 뗀다. 다만 숫자만
+                훑어 내지는 않는다 — 그러면 「지하1~4층」이 「1~4」가 되고 「8, 9층」이 89층이
+                되어, 화면에 보이는 것과 보내는 값이 달라진다(ranges.ts 참고).
+              */}
               <div className="min-w-0 flex-1">
                 <Field label="총 층수">
-                  <TextField
-                    value={value.totalFloors}
-                    onChange={(event) => onChange({ totalFloors: event.target.value })}
-                    placeholder="예: 8층"
-                    className="font-medium"
+                  <div className="flex w-full flex-col gap-1">
+                    <TextField
+                      value={value.totalFloors}
+                      inputMode="numeric"
+                      error={totalFloorsError !== null}
+                      onChange={(event) => onChange({ totalFloors: event.target.value })}
+                      placeholder="예: 8층"
+                      className="font-medium"
                     />
+                    {totalFloorsError && <FieldError>{totalFloorsError}</FieldError>}
+                  </div>
                 </Field>
               </div>
               <div className="min-w-0 flex-1">
                 <Field label="지점 운영층">
-                  <TextField
-                    value={value.operatingFloors}
-                    onChange={(event) => onChange({ operatingFloors: event.target.value })}
-                    placeholder="예: 2~4층"
-                    className="font-medium"
+                  <div className="flex w-full flex-col gap-1">
+                    <TextField
+                      value={value.operatingFloors}
+                      inputMode="numeric"
+                      error={floorRangeError !== null}
+                      onChange={(event) => onChange({ operatingFloors: event.target.value })}
+                      placeholder="예: 2~4층"
+                      className="font-medium"
                     />
+                    {floorRangeError && <FieldError>{floorRangeError}</FieldError>}
+                  </div>
                 </Field>
               </div>
             </div>

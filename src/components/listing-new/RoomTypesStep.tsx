@@ -4,21 +4,11 @@ import { PhotoPicker, type Photo } from '../form/PhotoPicker'
 import { TextField } from '../form/TextField'
 import { StepFooter } from './StepFooter'
 import { StepTitle } from './StepTitle'
+import { ROOM_FILTER_TAGS } from './catalogs'
 import { createRoomType, type RoomTypeDraft } from './draft'
 import chevronUrl from '../../assets/icon-chevron-down.svg'
 import plusUrl from '../../assets/icon-plus.svg'
 import trashUrl from '../../assets/icon-trash.svg'
-
-const ROOM_OPTIONS = [
-  '전입신고 가능',
-  '개인 화장실/개인 욕실',
-  '2인실',
-  '식사 제공',
-  '즉시 입주',
-  '영어 소통 가능',
-  '여성 전용',
-  '관리비 없음',
-]
 
 /** 객실 사진은 시안이 2장 이상을 요구한다. */
 const ROOM_PHOTO_MIN = 2
@@ -232,13 +222,13 @@ export function RoomTypesStep({
 
                   <Field label="각 방 타입별 옵션">
                     <ChipGroup>
-                      {ROOM_OPTIONS.map((option) => (
+                      {ROOM_FILTER_TAGS.map((item) => (
                         <Chip
-                          key={option}
-                          selected={room.options.includes(option)}
-                          onClick={() => toggleOption(room, option)}
+                          key={item.code}
+                          selected={room.options.includes(item.code)}
+                          onClick={() => toggleOption(room, item.code)}
                         >
-                          {option}
+                          {item.label}
                         </Chip>
                       ))}
                     </ChipGroup>

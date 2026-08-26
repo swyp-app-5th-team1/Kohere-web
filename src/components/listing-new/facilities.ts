@@ -21,6 +21,13 @@
  * 「슬리퍼」로 들어갔지만 구글 폼 · tally 가 쓰는 말이 실내화라 그쪽에 맞췄다.
  *
  * 이렇게 하면 8개 그룹이 전부 1:1 로 맞는다. 디자인팀 확인이 되면 이 주석을 지운다.
+ *
+ * 라벨은 **시안 표기**를 쓴다. 스키마 정의서 v2.0 의 `label.ko` 와 몇 군데 다른데
+ * (중앙난방 · 와이파이 · 공용 에어컨 · 공용 PC), 그건 서버가 조회 응답에 실어 주는 값이라
+ * 임대인 입력 화면과 꼭 같을 필요가 없다. 앱이나 웹 조회에서 표기가 어긋나 보이면 그때
+ * 어느 쪽을 고칠지 정하면 된다.
+ *
+ * 실내화만 예외다 — 시안은 「슬리퍼」인데 구글 폼 · tally 가 쓰는 말이라 PM 확인을 받았다.
  */
 
 /** 등록 요청에서의 자리. nearbyFacilities 만 facilities 바깥에 있다. */
@@ -124,9 +131,10 @@ export const FACILITY_GROUPS: FacilityGroup[] = [
       { code: 'BEDDING', label: '침구류' },
       { code: 'LAUNDRY_DETERGENT', label: '세탁세제' },
       { code: 'SEASONING', label: '조미료' },
-      { code: 'SLIPPERS', label: '실내화' },
       { code: 'TISSUE', label: '휴지' },
       { code: 'TOWEL', label: '수건' },
+      // 시안은 맨 뒤에 둔다. 서버 enum 순서(조미료 다음)와 다르지만 화면 순서일 뿐이다.
+      { code: 'SLIPPERS', label: '실내화' },
     ],
   },
   {

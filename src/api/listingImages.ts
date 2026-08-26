@@ -70,13 +70,13 @@ export function uploadErrorMessage(error: unknown): string {
 
   switch (error.code) {
     case 'LISTING_IMAGE_TOO_LARGE':
-      return '10MB 를 넘는 사진은 올릴 수 없어요'
+      return '10MB 이하 사진만 올릴 수 있어요'
 
     case 'LISTING_IMAGE_UNSUPPORTED_TYPE':
       return 'JPG · PNG 만 올릴 수 있어요'
 
     case 'LISTING_IMAGE_REQUIRED':
-      return '빈 파일이라 올릴 수 없어요'
+      return '내용이 없는 파일이에요'
 
     case 'FORBIDDEN':
     case 'AUTH_ONBOARDING_REQUIRED':

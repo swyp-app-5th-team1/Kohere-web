@@ -1,5 +1,6 @@
 import { StepFooter } from './StepFooter'
 import { StepTitle } from './StepTitle'
+import { StepBody } from './StepBody'
 import { SPACE_TYPES, type SpaceType } from './spaceTypes'
 import checkUrl from '../../assets/icon-circle-check-fill.svg'
 
@@ -17,7 +18,7 @@ type SpaceTypeStepProps = {
 export function SpaceTypeStep({ value, onChange, onNext }: SpaceTypeStepProps) {
   return (
     <>
-      <main className="flex w-full flex-1 flex-col items-center justify-center px-6 py-14">
+      <StepBody center>
         <div className="flex w-full max-w-[980px] flex-col gap-8">
           <StepTitle>어떤 공간을 등록하시나요?</StepTitle>
 
@@ -71,7 +72,7 @@ export function SpaceTypeStep({ value, onChange, onNext }: SpaceTypeStepProps) {
             })}
           </div>
         </div>
-      </main>
+      </StepBody>
 
       {/* 진행 표시줄 없이 앞에 붙는 단계라 step 을 넘기지 않고, 돌아갈 곳도 없어 onPrev 도 없다. */}
       <StepFooter onNext={onNext} nextDisabled={value === null} />

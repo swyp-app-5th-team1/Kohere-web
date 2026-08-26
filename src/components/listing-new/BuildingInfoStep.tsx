@@ -1,9 +1,11 @@
 import { Chip, ChipGroup } from '../form/Chip'
 import { Field, FieldError } from '../form/Field'
+import { useTouched } from '../form/useTouched'
 import { PhotoPicker, type Photo } from '../form/PhotoPicker'
 import { TextField } from '../form/TextField'
 import { StepFooter } from './StepFooter'
 import { StepTitle } from './StepTitle'
+import { StepBody } from './StepBody'
 import { BUILDING_TYPES } from './buildingTypes'
 import { floorCountError, floorSpanError, parseCount } from './ranges'
 import type { BuildingDraft } from './draft'
@@ -35,9 +37,15 @@ export function BuildingInfoStep({
   onPrev,
   onNext,
 }: BuildingInfoStepProps) {
+  const touched = useTouched()
+
   /* 서버가 400 을 내는 조건을 미리 본다 — ranges.ts 의 형식 규칙을 그대로 쓴다. */
   const totalFloorsError = floorCountError(value.totalFloors)
   const floorRangeError = floorSpanError(value.operatingFloors, parseCount(value.totalFloors))
+
+  /* 다음 버튼은 위 값으로 잠그고, 빨간 문구는 한 번 다녀간 칸에만 그린다. */
+  const shownTotalFloorsError = touched.error('totalFloors', totalFloorsError)
+  const shownFloorRangeError = touched.error('operatingFloors', floorRangeError)
 
   const filled =
     totalFloorsError === null &&
@@ -51,7 +59,7 @@ export function BuildingInfoStep({
 
   return (
     <>
-      <main className="flex w-full flex-1 flex-col items-center px-6 py-14">
+      <StepBody>
         <div className="flex w-full max-w-[980px] flex-col gap-8">
           <StepTitle>건물 정보를 입력해주세요.</StepTitle>
 
@@ -83,12 +91,13 @@ export function BuildingInfoStep({
                     <TextField
                       value={value.totalFloors}
                       inputMode="numeric"
-                      error={totalFloorsError !== null}
+                      error={shownTotalFloorsError !== null}
                       onChange={(event) => onChange({ totalFloors: event.target.value })}
+                      onBlur={() => touched.touch('totalFloors')}
                       placeholder="예: 8층"
                       className="font-medium"
                     />
-                    {totalFloorsError && <FieldError>{totalFloorsError}</FieldError>}
+                    {shownTotalFloorsError && <FieldError>{shownTotalFloorsError}</FieldError>}
                   </div>
                 </Field>
               </div>
@@ -98,12 +107,13 @@ export function BuildingInfoStep({
                     <TextField
                       value={value.operatingFloors}
                       inputMode="numeric"
-                      error={floorRangeError !== null}
+                      error={shownFloorRangeError !== null}
                       onChange={(event) => onChange({ operatingFloors: event.target.value })}
+                      onBlur={() => touched.touch('operatingFloors')}
                       placeholder="예: 2~4층"
                       className="font-medium"
                     />
-                    {floorRangeError && <FieldError>{floorRangeError}</FieldError>}
+                    {shownFloorRangeError && <FieldError>{shownFloorRangeError}</FieldError>}
                   </div>
                 </Field>
               </div>
@@ -159,7 +169,7 @@ export function BuildingInfoStep({
             </Field>
           </div>
         </div>
-      </main>
+      </StepBody>
 
       <StepFooter step={2} onPrev={onPrev} onNext={onNext} nextDisabled={!filled} />
     </>

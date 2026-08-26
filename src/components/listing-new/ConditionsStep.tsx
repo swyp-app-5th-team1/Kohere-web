@@ -2,6 +2,7 @@ import { Chip, ChipGroup } from '../form/Chip'
 import { Field } from '../form/Field'
 import { StepFooter } from './StepFooter'
 import { StepTitle } from './StepTitle'
+import { StepBody } from './StepBody'
 import type { ConditionsDraft } from './draft'
 
 import { AGE_BOUND, formatRange, parseRange, rangeText } from './ranges'
@@ -52,7 +53,7 @@ export function ConditionsStep({ value, onChange, onPrev, onNext }: ConditionsSt
 
   return (
     <>
-      <main className="flex w-full flex-1 flex-col items-center px-6 py-14">
+      <StepBody>
         <div className="flex w-full max-w-[980px] flex-col gap-8">
           <StepTitle>숙소의 입주조건을 선택해주세요.</StepTitle>
 
@@ -144,7 +145,7 @@ export function ConditionsStep({ value, onChange, onPrev, onNext }: ConditionsSt
             </Field>
           </div>
         </div>
-      </main>
+      </StepBody>
 
       <StepFooter step={3} onPrev={onPrev} onNext={onNext} nextDisabled={!filled} />
     </>

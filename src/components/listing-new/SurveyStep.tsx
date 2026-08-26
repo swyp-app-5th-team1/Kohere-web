@@ -2,6 +2,7 @@ import { Chip } from '../form/Chip'
 import { Field } from '../form/Field'
 import { StepFooter } from './StepFooter'
 import { StepTitle } from './StepTitle'
+import { StepBody } from './StepBody'
 import type { SurveyDraft } from './draft'
 
 import { CONTRACT_DIFFICULTIES, PREFERRED_NATIONALITIES } from './catalogs'
@@ -33,7 +34,7 @@ export function SurveyStep({ value, onChange, onPrev, onNext }: SurveyStepProps)
 
   return (
     <>
-      <main className="flex w-full flex-1 flex-col items-center px-6 py-14">
+      <StepBody>
         <div className="flex w-full max-w-[980px] flex-col gap-8">
           <div className="flex flex-col gap-1">
             <StepTitle>추가 질문 사항 (선택)</StepTitle>
@@ -94,7 +95,7 @@ export function SurveyStep({ value, onChange, onPrev, onNext }: SurveyStepProps)
             </Field>
           </div>
         </div>
-      </main>
+      </StepBody>
 
       <StepFooter step={6} onPrev={onPrev} onNext={onNext} nextLabel={answered ? '다음' : '건너뛰기'} />
     </>

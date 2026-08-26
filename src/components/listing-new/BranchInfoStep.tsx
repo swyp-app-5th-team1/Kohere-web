@@ -19,6 +19,7 @@ import { narrowCandidates } from '../../lib/addressMatch'
 import { CandidateDialog } from './CandidateDialog'
 import { StepFooter } from './StepFooter'
 import { StepTitle } from './StepTitle'
+import { StepBody } from './StepBody'
 import type { BranchDraft } from './draft'
 import locationUrl from '../../assets/icon-location.svg'
 
@@ -170,7 +171,7 @@ export function BranchInfoStep({ value, onChange, onPrev, onNext }: BranchInfoSt
 
   return (
     <>
-      <main className="flex w-full flex-1 flex-col items-center px-6 py-14">
+      <StepBody>
         <div className="flex w-full max-w-[980px] flex-col gap-8">
           <StepTitle>지점을 소개해 주세요.</StepTitle>
 
@@ -277,7 +278,7 @@ export function BranchInfoStep({ value, onChange, onPrev, onNext }: BranchInfoSt
             />
           </Field>
         </div>
-      </main>
+      </StepBody>
 
       {/* 우편번호 창에서 고른 주소가 여러 건으로 갈릴 때만 뜬다. */}
       <CandidateDialog<AddressCandidate>

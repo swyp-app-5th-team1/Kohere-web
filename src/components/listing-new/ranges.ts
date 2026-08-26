@@ -60,8 +60,9 @@ export const AGE_BOUND = { min: 18, max: 70 }
 export function floorCountError(text: string): string | null {
   if (text.trim() === '') return null
   const count = parseCount(text)
-  if (count === null) return '8 또는 8층 처럼 적어 주세요'
-  if (count < 1) return '총 층수는 1층부터 적을 수 있어요'
+  // 「하나만」을 밝혀 둔다. 없으면 「8, 9층」을 막았을 때 범위를 적으라는 뜻으로 읽힌다.
+  if (count === null) return '총 층수는 8 또는 8층 처럼 하나만 적어 주세요'
+  if (count < 1) return '총 층수는 1층부터 적어 주세요'
   return null
 }
 
@@ -75,9 +76,9 @@ export function floorSpanError(text: string, total: number | null): string | nul
 
   const span = parseSpan(text)
   if (span === null) return '1~2 또는 2~4층 처럼 적어 주세요'
-  if (span.min < 1) return '운영층은 1층부터 적을 수 있어요'
-  if (span.min > span.max) return '앞 층이 뒤 층보다 높을 수 없어요'
-  if (total !== null && span.max > total) return '운영층이 총 층수를 넘을 수 없어요'
+  if (span.min < 1) return '운영층은 1층부터 적어 주세요'
+  if (span.min > span.max) return '끝 층을 시작 층보다 높게 적어 주세요'
+  if (total !== null && span.max > total) return '운영층은 총 층수 안에서 적어 주세요'
 
   return null
 }

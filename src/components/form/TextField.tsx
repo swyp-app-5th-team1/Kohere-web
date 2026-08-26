@@ -12,6 +12,13 @@ type TextFieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> & {
   onClear?: () => void
   /** 지우기 버튼이 있을 때만 쓰는 바깥 상자용 클래스. 너비 · flex 같은 배치를 여기 준다. */
   wrapperClassName?: string
+  /**
+   * 칸 안 오른쪽에 붙는 단위 (「원」 · 「개월」).
+   *
+   * placeholder 와 달리 값을 쳐도 안 사라진다. 단위가 화면 어디에도 없는 칸에 쓴다 —
+   * 방 타입의 금액 · 이용기간이 그렇다.
+   */
+  suffix?: string
 }
 
 /**
@@ -25,9 +32,32 @@ export function TextField({
   className = '',
   onClear,
   wrapperClassName = '',
+  suffix,
   ...rest
 }: TextFieldProps) {
   const shape = (error ? inputErrorClass : inputClass) + (className ? ' ' + className : '')
+
+  if (suffix) {
+    return (
+      <div className={'relative w-full ' + wrapperClassName}>
+        <input
+          {...rest}
+          type="text"
+          aria-invalid={error || undefined}
+          className={shape}
+          /*
+           * 단위 글자 자리를 비워 둔다. 칸의 오른쪽 여백(1rem) + 글자 폭 + 사이 0.5rem 이다.
+           * 「원」·「개월」은 전각이라 한 자가 대략 1em 이라 글자 수로 잡아도 맞는다.
+           */
+          style={{ ...rest.style, paddingRight: `calc(1.5rem + ${suffix.length}em)` }}
+        />
+        {/* 눌러도 칸이 잡히게 클릭을 흘려 보낸다. */}
+        <span className="text-cool-neutral-30 pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 text-lg leading-6">
+          {suffix}
+        </span>
+      </div>
+    )
+  }
 
   // 지우기가 없으면 예전 그대로 input 하나만 그린다. 바깥 상자가 생기면 배치가 달라져서다.
   if (!onClear) {

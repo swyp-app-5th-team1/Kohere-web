@@ -39,6 +39,39 @@ export function formatPhone(raw: string): string {
   return join(digits, digits.length > 10 ? [3, 4, 4] : [3, 3, 4])
 }
 
+/**
+ * 자릿수가 다 찼는지. formatPhone 이 받아 주는 모양마다 길이가 다르다.
+ *
+ * 하이픈을 넣어 주다 보니 `010-1` 도 번듯해 보인다. 그래서 비었는지만 봐서는 덜 친 번호가
+ * 그대로 넘어간다.
+ */
+export function isPhoneComplete(value: string): boolean {
+  const digits = value.replace(/\D/g, '')
+
+  if (digits.startsWith('010')) return digits.length === 11
+  if (digits.startsWith('02')) return digits.length === 9 || digits.length === 10
+  if (/^1[5-8]/.test(digits)) return digits.length === 8
+  if (digits.startsWith('0')) return digits.length === 10 || digits.length === 11
+
+  return false
+}
+
+/**
+ * 화면의 `010-1234-5678` 을 서버가 받는 `+82) 10-1234-5678` 로 바꾼다.
+ *
+ * 나라를 묻는 칸이 어디에도 없어서 한국 번호로 본다. 국제 표기는 앞의 `0` 을 떼는 게
+ * 규칙이라 서울 번호도 `+82) 2-1234-5678` 이 된다. 15xx 대표번호는 `0` 이 없어 그대로 둔다.
+ *
+ * 자릿수가 덜 찼으면 null 이라 호출부에서 제출을 막는다.
+ *
+ * TODO(백엔드 확인): 스펙 예시가 `+82) 10-1234-5678` 하나뿐이라 서울 · 대표번호도 받는지
+ * 모른다. 괄호 뒤 공백이 필수인지도 예시로만 짐작한 것이다.
+ */
+export function phoneToServer(value: string): string | null {
+  if (!isPhoneComplete(value)) return null
+  return `+82) ${formatPhone(value).replace(/^0/, '')}`
+}
+
 /** 사업자등록번호는 10자리 3-2-5 로 고정이다. */
 export function formatBusinessNumber(raw: string): string {
   return join(digitsOf(raw, 10), [3, 2, 5])

@@ -2,6 +2,7 @@ import { Chip, ChipGroup } from '../form/Chip'
 import { Field } from '../form/Field'
 import { StepFooter } from './StepFooter'
 import { StepTitle } from './StepTitle'
+import { StepBody } from './StepBody'
 import {
   FACILITY_GROUPS,
   FACILITY_NONE,
@@ -50,7 +51,7 @@ export function AmenitiesStep({ value, onChange, onPrev, onNext }: AmenitiesStep
 
   return (
     <>
-      <main className="flex w-full flex-1 flex-col items-center px-6 py-14">
+      <StepBody>
         <div className="flex w-full max-w-[980px] flex-col gap-8">
           <StepTitle>숙소에 갖춰진 편의 시설을 선택해주세요.</StepTitle>
 
@@ -84,7 +85,7 @@ export function AmenitiesStep({ value, onChange, onPrev, onNext }: AmenitiesStep
             })}
           </div>
         </div>
-      </main>
+      </StepBody>
 
       <StepFooter step={4} onPrev={onPrev} onNext={onNext} nextDisabled={!filled} />
     </>

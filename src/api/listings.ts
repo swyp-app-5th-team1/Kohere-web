@@ -87,6 +87,57 @@ export function searchNearbyStations(
   return api.get<Items<StationCandidate>>(`${STATION_NEARBY_PATH}?${query}`)
 }
 
+const CREATE_PATH = '/api/v2/listings'
+
+/**
+ * 등록 응답에서 화면이 쓰는 값만 추린다.
+ *
+ * 접수 번호라는 필드는 없다 — `listingId` 가 그 자리를 대신한다. `status` 는 등록 직후
+ * 늘 `PENDING` 이고, 승인 심사를 거쳐야 세입자에게 보인다.
+ */
+export type CreatedListing = {
+  listingId: string
+  status: string
+}
+
+/** 매물을 등록한다. 사진은 미리 올려 둔 key 로 실려 간다. */
+export function createListing(payload: unknown): Promise<CreatedListing> {
+  return api.post<CreatedListing>(CREATE_PATH, payload)
+}
+
+/** 등록 실패 문구. 분기는 error.code 로 한다. */
+export function createErrorMessage(error: unknown): string {
+  if (!(error instanceof ApiError)) {
+    return '등록 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.'
+  }
+
+  switch (error.code) {
+    /*
+     * 화면에서 이미 거른 것들이라 여기까지 오면 우리 매핑이 서버와 어긋났다는 뜻이다.
+     * 어느 필드인지 서버가 알려주므로 그대로 보여 준다 — 임대인이 고칠 수 있는 값일 수 있다.
+     */
+    case 'INVALID_INPUT':
+      return error.fieldErrors[0]?.reason ?? '입력한 내용을 다시 확인해 주세요.'
+
+    // 사진 key 가 7일을 넘겨 사라졌다. 사진부터 다시 올려야 한다.
+    case 'LISTING_IMAGE_NOT_FOUND':
+      return '올린 사진이 만료되었습니다. 사진을 다시 올려 주세요.'
+
+    case 'LISTING_UNKNOWN_CATALOG_CODE':
+      return '선택한 항목 중 서버가 모르는 값이 있습니다. 잠시 후 다시 시도해 주세요.'
+
+    case 'FORBIDDEN':
+    case 'AUTH_ONBOARDING_REQUIRED':
+      return '임대인 계정으로 온보딩을 마쳐야 매물을 등록할 수 있습니다.'
+
+    case 'UPSTREAM_ERROR':
+      return '등록 서비스가 일시적으로 불안정합니다. 잠시 후 다시 시도해 주세요.'
+
+    default:
+      return '등록 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.'
+  }
+}
+
 /** 두 검색이 공유하는 실패 문구. 어느 쪽이 비었는지는 호출부가 판단한다. */
 export function searchErrorMessage(error: unknown): string {
   if (!(error instanceof ApiError)) {

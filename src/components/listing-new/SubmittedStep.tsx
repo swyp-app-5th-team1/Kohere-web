@@ -1,9 +1,7 @@
 import { Link } from 'react-router-dom'
 import { StepTitle } from './StepTitle'
+import { StepBody } from './StepBody'
 import checkUrl from '../../assets/icon-circle-check-large.svg'
-
-/** 접수 번호는 서버가 발급한다. 연동 전까지는 시안의 값을 그대로 보여준다. */
-const PLACEHOLDER_RECEIPT_NO = 'KH-2026-0142'
 
 const formatToday = () => {
   const now = new Date()
@@ -13,14 +11,21 @@ const formatToday = () => {
 }
 
 type SubmittedStepProps = {
+  /**
+   * 서버가 발급한 매물 id. 접수 번호라는 필드가 따로 없어 이걸 그 자리에 보여 준다.
+   *
+   * TODO(기획 확인): 24자리 hex 라 시안의 `KH-2026-0142` 처럼 임대인이 불러 주기 어렵다.
+   * 짧은 접수 번호를 서버가 따로 발급할지 정해야 한다.
+   */
+  receiptNo: string | null
   onRestart: () => void
 }
 
 /** 매물 등록 완료 화면. 하단 진행 표시줄과 이전/다음이 없다. */
-export function SubmittedStep({ onRestart }: SubmittedStepProps) {
+export function SubmittedStep({ receiptNo, onRestart }: SubmittedStepProps) {
   return (
     // 시안에서 이 화면만 본문이 세로 가운데에 온다.
-    <main className="flex w-full flex-1 flex-col items-center justify-center px-6 py-14">
+    <StepBody center>
       <div className="flex w-[423px] max-w-full flex-col items-center gap-12">
         <div className="flex flex-col items-center gap-4">
           <img src={checkUrl} alt="" className="size-[100px]" />
@@ -39,9 +44,7 @@ export function SubmittedStep({ onRestart }: SubmittedStepProps) {
         <div className="bg-secondary-10 flex w-full flex-col gap-2.5 rounded-2xl px-6 py-5 text-lg">
           <div className="flex w-full items-center justify-between pr-1">
             <span className="text-cool-neutral-50 leading-6">접수 번호</span>
-            <span className="text-cool-neutral-80 leading-6 font-medium">
-              {PLACEHOLDER_RECEIPT_NO}
-            </span>
+            <span className="text-cool-neutral-80 leading-6 font-medium">{receiptNo ?? '-'}</span>
           </div>
           <div className="flex w-full items-center justify-between pr-1">
             <span className="text-cool-neutral-50 leading-6">제출일</span>
@@ -65,6 +68,6 @@ export function SubmittedStep({ onRestart }: SubmittedStepProps) {
           </button>
         </div>
       </div>
-    </main>
+    </StepBody>
   )
 }

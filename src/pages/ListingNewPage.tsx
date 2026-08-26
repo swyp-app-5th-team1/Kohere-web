@@ -6,7 +6,9 @@ import {
   uploadErrorMessage,
   uploadListingImage,
 } from '../api/listingImages'
+import { createErrorMessage, createListing } from '../api/listings'
 import { downscaleImage } from '../lib/downscaleImage'
+import { buildListingRequest } from '../components/listing-new/submit'
 import { AmenitiesStep } from '../components/listing-new/AmenitiesStep'
 import { BranchInfoStep } from '../components/listing-new/BranchInfoStep'
 import { BuildingInfoStep } from '../components/listing-new/BuildingInfoStep'
@@ -169,6 +171,12 @@ export default function ListingNewPage() {
     const urls = createdUrls.current
     return () => urls.forEach((url) => URL.revokeObjectURL(url))
   }, [])
+
+  /** 등록 중에는 제출 버튼을 잠근다. 두 번 누르면 매물이 두 개 생긴다. */
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  /** 서버가 발급한 매물 id. 완료 화면이 접수 번호 자리에 보여 준다. */
+  const [receiptNo, setReceiptNo] = useState<string | null>(null)
 
   /** 목록에 못 넣은 파일. 형식이 안 맞거나 끝내 올리지 못한 것들이다. */
   const [failures, setFailures] = useState<{ name: string; reason: string }[]>([])
@@ -336,18 +344,54 @@ export default function ListingNewPage() {
 
   const goPrev = () => setDraft((current) => ({ ...current, step: current.step - 1 }))
 
+  /*
+   * draft 상태의 사진 목록은 처음 불러올 때 것 그대로다 — 사진은 photos 상태로 살고 저장할
+   * 때만 변환해 담는다. 그래서 저장 직전에 항상 지금 사진으로 갈아 끼운다. 이걸 빼먹으면
+   * 「다음」이 방금 올린 사진을 옛 목록으로 덮어써 버린다.
+   */
+  const withPhotos = (base: ListingDraft): ListingDraft => ({
+    ...base,
+    branchPhotos: toStored(photos),
+    roomPhotos: toStoredMap(roomPhotos),
+  })
+
   const goNext = () => {
     setDraft((current) => {
       const next = { ...current, step: current.step + 1 }
-      saveDraft(next)
+      saveDraft(withPhotos(next))
       return next
     })
   }
 
-  /** 제출하면 임시 저장본을 비운다. 서버 연동 전이라 화면만 완료로 넘긴다. */
-  const submit = () => {
-    clearDraft()
-    setDraft((current) => ({ ...current, step: 9 }))
+  /**
+   * 매물을 등록한다.
+   *
+   * 임시 저장본은 **성공한 뒤에만** 비운다. 먼저 비우면 실패했을 때 적은 게 전부 사라진다.
+   * 사진도 마찬가지라 photos 상태를 건드리지 않는다 — 다시 눌러 보면 그대로 올라간다.
+   */
+  const submit = async () => {
+    if (submitting) return
+
+    const payload = buildListingRequest(draft, photos, roomPhotos)
+    if (payload === null) {
+      // 각 단계에서 이미 막고 있어서 여기까지 오는 건 임시 저장을 되살린 경우 정도다.
+      setSubmitError('입력하신 내용 중 빠진 것이 있습니다. 이전 단계를 다시 확인해 주세요.')
+      return
+    }
+
+    setSubmitting(true)
+    setSubmitError(null)
+
+    try {
+      const created = await createListing(payload)
+      clearDraft()
+      setReceiptNo(created.listingId)
+      setDraft((current) => ({ ...current, step: 9 }))
+    } catch (error) {
+      setSubmitError(createErrorMessage(error))
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const restart = () => {
@@ -356,6 +400,8 @@ export default function ListingNewPage() {
     setPhotos([])
     setRoomPhotos({})
     setExpandedRoomId(null)
+    setReceiptNo(null)
+    setSubmitError(null)
   }
 
   const patch = <Section extends 'branch' | 'building' | 'conditions' | 'survey' | 'contact'>(
@@ -366,7 +412,11 @@ export default function ListingNewPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-white">
+    /*
+     * 화면 높이에 딱 맞춘 세로 flex 다. 헤더와 하단(진행 표시줄 + 이전/다음)은 제자리에
+     * 두고 가운데 본문만 굴린다 — 스크롤은 StepBody 가 맡는다.
+     */
+    <div className="flex h-dvh flex-col overflow-hidden bg-white">
       <AppHeader />
 
       {draft.step === 0 && (
@@ -459,11 +509,13 @@ export default function ListingNewPage() {
           draft={draft}
           photos={photos}
           roomPhotos={roomPhotos}
-          onSaveDraft={() => saveDraft(draft)}
-          onSubmit={submit}
+          onSaveDraft={() => saveDraft(withPhotos(draft))}
+          onSubmit={() => void submit()}
+          submitting={submitting}
+          submitError={submitError}
         />
       )}
-      {draft.step === 9 && <SubmittedStep onRestart={restart} />}
+      {draft.step === 9 && <SubmittedStep receiptNo={receiptNo} onRestart={restart} />}
     </div>
   )
 }

@@ -51,6 +51,7 @@ export function BranchInfoStep({ value, onChange, onPrev, onNext }: BranchInfoSt
   /** 인근 역 팝업. 열 때 좌표로 미리 받아 둔 목록을 함께 넘긴다. */
   const [stationOpen, setStationOpen] = useState(false)
   const [nearbyStations, setNearbyStations] = useState<StationCandidate[]>([])
+  const [nearbyLoading, setNearbyLoading] = useState(false)
 
   // 버튼을 누른 뒤에 받으면 사용자 조작 맥락이 끊겨 팝업이 막힌다. 화면에 들어올 때 미리 받는다.
   useEffect(() => {
@@ -133,12 +134,16 @@ export function BranchInfoStep({ value, onChange, onPrev, onNext }: BranchInfoSt
     if (value.lat === null || value.lng === null) return
 
     setStationOpen(true)
+    setNearbyStations([])
+    setNearbyLoading(true)
     try {
       const { items } = await searchNearbyStations(value.lat, value.lng)
       setNearbyStations(items)
     } catch {
       // 실패해도 팝업은 열어 둔다. 이름으로 검색하면 되기 때문이다.
       setNearbyStations([])
+    } finally {
+      setNearbyLoading(false)
     }
   }
 
@@ -292,9 +297,12 @@ export function BranchInfoStep({ value, onChange, onPrev, onNext }: BranchInfoSt
         open={stationOpen}
         onClose={() => setStationOpen(false)}
         title="인근 역 선택"
+        // 무엇을 기준으로 가까운 역인지 팝업 안에서 알 수 있게 주소를 같이 띄운다.
+        subtitle={value.address}
         placeholder="역 이름으로 검색 (예: 신촌)"
         initialItems={nearbyStations}
-        initialLabel="추천 · 주소 주변의 역"
+        initialLabel="가까운 역"
+        initialLoading={nearbyLoading}
         emptyHint="찾는 역이 없습니다. 역 이름으로 검색해 보세요."
         onSearch={async (keyword) =>
           (await searchStations(keyword, value.lat!, value.lng!)).items

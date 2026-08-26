@@ -12,6 +12,8 @@ type DaumPostcodeData = {
   zonecode: string
   roadAddress: string
   jibunAddress: string
+  /** 도로명을 고르면 jibunAddress 가 비고 이쪽에 지번이 담긴다. */
+  autoJibunAddress: string
   buildingName: string
 }
 
@@ -29,15 +31,21 @@ export type PostcodeResult = {
   /** 5자리 우편번호 */
   postalCode: string
   /**
-   * 도로명 주소. 매물 등록의 `address.fullAddress` 에 **그대로** 실린다.
+   * 도로명 주소. 도로명이 부여되지 않은 곳은 빈 문자열이다.
    *
-   * 서버가 이 문자열에서 시·도와 구·군을 뽑아내므로 건물명 같은 걸 덧붙이면 안 되고,
-   * 사용자가 지번을 골랐더라도 도로명을 보낸다. 건물명·동호수는 상세 주소 칸이 받는다.
+   * 이 값을 등록에 그대로 싣지는 않는다 — 좌표와 짝을 맞추려고 주소 검색 API 를 한 번 더
+   * 부르고, 거기서 받은 표준 주소를 담는다. 여기 값은 검색어와 후보 대조에만 쓴다.
    */
-  address: string
+  roadAddress: string
+  /** 지번 주소. 후보가 여럿일 때 어느 것이 맞는지 가르는 데 쓴다. */
+  jibunAddress: string
   /** 참고용 건물명. 상세 주소를 채울 때 힌트로 쓸 수 있다. */
   buildingName: string
 }
+
+/** 주소 검색 API 에 보낼 검색어. 도로명이 없으면 지번으로라도 찾아본다. */
+export const postcodeKeyword = (result: PostcodeResult) =>
+  result.roadAddress || result.jibunAddress
 
 let loading: Promise<void> | null = null
 
@@ -82,8 +90,9 @@ export function openPostcodeSearch(
       oncomplete: (data) => {
         onComplete({
           postalCode: data.zonecode,
-          // 지번을 골랐어도 도로명을 넘긴다. 서버가 도로명 기준으로 지역을 판별한다.
-          address: data.roadAddress || data.jibunAddress,
+          roadAddress: data.roadAddress,
+          // 도로명을 고르면 jibunAddress 가 비고 autoJibunAddress 에 들어온다.
+          jibunAddress: data.jibunAddress || data.autoJibunAddress,
           buildingName: data.buildingName,
         })
       },

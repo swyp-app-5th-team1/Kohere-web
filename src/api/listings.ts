@@ -1,0 +1,112 @@
+import { ApiError, api } from './client'
+
+/*
+ * 매물 등록 폼을 채우는 조회 API 둘.
+ *
+ * 둘 다 성격이 같다 — 검색해서 후보를 받고, 사용자가 고른 **한 건을 가공 없이 그대로**
+ * 등록 요청에 싣는다. 서버는 이 검색을 호출했는지 확인하지 않으므로, 우리가 값을 다듬거나
+ * 지어내면 그대로 매물 데이터가 된다.
+ *
+ * 공개 조회인 다른 /listings/* 와 달리 인증이 필요하다 (임대인 · 온보딩 완료).
+ */
+const ADDRESS_SEARCH_PATH = '/api/v1/listings/addresses'
+const STATION_SEARCH_PATH = '/api/v1/listings/stations'
+const STATION_NEARBY_PATH = '/api/v1/listings/stations/nearby'
+
+export type AddressCandidate = {
+  /**
+   * 표준 도로명 주소. 등록 요청의 `address.fullAddress` 에 그대로 실린다.
+   *
+   * 건물명이 붙어 올 수 있는데 서버가 다듬지 않는다 — 보이는 그대로 보내면 된다.
+   * 다음 우편번호가 준 문자열이 아니라 **이 값**을 보내야 아래 좌표와 짝이 맞는다.
+   */
+  roadAddress: string
+  jibunAddress: string
+  /** 외국인 대상 서비스라 나중에 쓸 값. 등록 요청에는 자리가 없다. */
+  englishAddress: string
+  lat: number
+  lng: number
+}
+
+export type StationCandidate = {
+  /** 노선까지 붙은 표준 이름(`신촌역 2호선`). 환승역은 노선별로 따로 온다. */
+  name: string
+  roadAddress: string
+  jibunAddress: string
+  lat: number
+  lng: number
+  /** 좌표를 함께 보냈을 때만 채워진다. */
+  distanceMeters: number | null
+  /** 직선거리 기준 하한이라 실제 보행 시간은 더 걸린다. 좌표 없이 부르면 null. */
+  suggestedWalkMinutes: number | null
+}
+
+type Items<T> = { items: T[] }
+
+/**
+ * 도로명 주소를 검색해 표준 주소와 좌표를 받는다.
+ *
+ * **도로명 + 건물번호까지 넣어야 결과가 나온다.** `신촌` 처럼 일부만 보내면 후보가 비고
+ * `신촌로 12` 면 나온다. 그래서 0건은 대개 「없는 주소」가 아니라 「덜 적은 검색어」다.
+ *
+ * 외부 호출 조건(건수 · 페이지 · 언어)은 서버가 고정하므로 keyword 만 보낸다.
+ * 도로명이 없는 결과는 서버가 제외하고 준다.
+ */
+export function searchAddresses(keyword: string): Promise<Items<AddressCandidate>> {
+  const query = new URLSearchParams({ keyword })
+  return api.get<Items<AddressCandidate>>(`${ADDRESS_SEARCH_PATH}?${query}`)
+}
+
+/**
+ * 역 이름으로 검색한다. 좌표를 함께 보내면 거리순으로 정렬되고 거리 · 도보시간이 채워진다.
+ *
+ * 좌표는 선택이지만 우리는 항상 보낸다. 주소를 먼저 고르므로 좌표가 이미 손에 있고,
+ * 전국에 같은 이름이 있는 역(`시청역`)을 거리로 가려낼 수 있기 때문이다.
+ * lat · lng 는 **둘 다 있거나 둘 다 없어야** 한다. 하나만 보내면 400 이다.
+ */
+export function searchStations(
+  keyword: string,
+  lat: number,
+  lng: number,
+): Promise<Items<StationCandidate>> {
+  const query = new URLSearchParams({ keyword, lat: String(lat), lng: String(lng) })
+  return api.get<Items<StationCandidate>>(`${STATION_SEARCH_PATH}?${query}`)
+}
+
+/**
+ * 좌표 주변의 역을 거리순으로 받는다. 검색어가 필요 없다.
+ *
+ * 결과가 비면 「역이 없다」기보다 조회 반경 밖일 가능성이 크다. 그때는 이름 검색
+ * (searchStations)으로 넘겨서 임대인이 직접 찾게 한다.
+ */
+export function searchNearbyStations(
+  lat: number,
+  lng: number,
+): Promise<Items<StationCandidate>> {
+  const query = new URLSearchParams({ lat: String(lat), lng: String(lng) })
+  return api.get<Items<StationCandidate>>(`${STATION_NEARBY_PATH}?${query}`)
+}
+
+/** 두 검색이 공유하는 실패 문구. 어느 쪽이 비었는지는 호출부가 판단한다. */
+export function searchErrorMessage(error: unknown): string {
+  if (!(error instanceof ApiError)) {
+    return '검색 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.'
+  }
+
+  switch (error.code) {
+    case 'INVALID_INPUT':
+      return error.fieldErrors[0]?.reason ?? '검색어를 다시 확인해 주세요.'
+
+    // 임대인이 아니거나 온보딩을 마치지 않은 계정이다. 매물 등록 자체를 할 수 없다.
+    case 'FORBIDDEN':
+    case 'AUTH_ONBOARDING_REQUIRED':
+      return '임대인 계정으로 온보딩을 마쳐야 매물을 등록할 수 있습니다.'
+
+    // 서버가 대신 부르는 외부 지오코딩 · 지도 서비스 쪽 문제다. 잠시 뒤면 풀린다.
+    case 'UPSTREAM_ERROR':
+      return '검색 서비스가 일시적으로 불안정합니다. 잠시 후 다시 시도해 주세요.'
+
+    default:
+      return '검색 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.'
+  }
+}

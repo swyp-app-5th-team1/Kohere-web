@@ -12,13 +12,36 @@ import type { SpaceType } from './spaceTypes'
 
 const DRAFT_KEY = 'kohere.listingDraft'
 
+/**
+ * 임대인이 고른 인근 역.
+ *
+ * 등록 요청의 `nearestTransit` 에 그대로 실린다 — 이름은 서버가 준 표준 표기라
+ * 화면에서 순서를 바꾸거나 다듬으면 안 된다(`신촌역 2호선`).
+ */
+export type NearestTransitDraft = {
+  name: string
+  walkMinutes: number
+}
+
 export type BranchDraft = {
   name: string
-  /** 우편번호 5자리. 주소 검색이 함께 주는 값이라 버리지 않고 담아 둔다. */
+  /** 우편번호 5자리. 다음 우편번호가 함께 주는 값이라 버리지 않고 담아 둔다. */
   postalCode: string
+  /**
+   * 표준 도로명 주소. 다음 우편번호가 준 문자열이 아니라 **주소 검색 API 가 준 값**이다.
+   * 아래 좌표와 짝이 맞아야 해서 그렇다.
+   */
   address: string
   addressDetail: string
-  nearbyStation: string
+  /**
+   * 주소의 좌표. 사용자가 입력하는 값이 아니라 주소를 고르면 따라온다.
+   *
+   * 메모리에만 두면 새로고침 때 주소는 남고 좌표만 사라져서, 다 채워진 것처럼 보이는데
+   * 제출이 실패한다. 그래서 임시 저장에 함께 담는다.
+   */
+  lat: number | null
+  lng: number | null
+  nearestTransit: NearestTransitDraft | null
   description: string
 }
 
@@ -103,7 +126,9 @@ export function emptyDraft(): ListingDraft {
       postalCode: '',
       address: '',
       addressDetail: '',
-      nearbyStation: '',
+      lat: null,
+      lng: null,
+      nearestTransit: null,
       description: '',
     },
     building: {

@@ -1,5 +1,10 @@
 import { useState } from 'react'
-import { isEmailShaped, requestPasswordResetLink, resetLinkErrorMessage } from '../api/auth'
+import {
+  isEmailShaped,
+  MAX_LOGIN_ATTEMPTS,
+  requestPasswordResetLink,
+  resetLinkErrorMessage,
+} from '../api/auth'
 import { Modal, ModalHeading } from './Modal'
 import { ctaDisabledClass, ctaPrimaryClass } from './form/CtaButton'
 import { TextField } from './form/TextField'
@@ -8,9 +13,11 @@ import { TextField } from './form/TextField'
  * 로그인 실패 팝업 두 개 (시안 224:30719 · 224:30728).
  *
  * 시안이 「로그인 8회 실패」, 「10회 실패하여 계정이 잠겼습니다」처럼 횟수를 글자로 박아
- * 두었는데, 이제 서버가 401 응답에 failedAttempts · maxFailedAttempts 를 실어 준다.
- * 다만 비밀번호가 틀린 경우에만 실리므로(미등록 이메일 · 시도 한도 초과에는 없다)
- * 숫자가 없는 경우도 항상 함께 그린다.
+ * 두었다. 서버가 401 에 failedAttempts · maxFailedAttempts 를 실어 주지만 비밀번호가
+ * 틀린 경우에만 실린다 — 잠긴 계정(423)이나 미등록 이메일에는 없다.
+ *
+ * 그래서 누적 횟수만 서버 값이 있을 때 쓰고, 잠금 기준은 정책 상수(MAX_LOGIN_ATTEMPTS)로
+ * 채운다. 계정마다 다른 값이 아니라 매번 받아 올 이유가 없다.
  */
 
 /** 401 AUTH_INVALID_CREDENTIALS — 이메일이 없거나 비밀번호가 틀렸을 때. */
@@ -24,7 +31,7 @@ export function LoginFailedDialog({
   onClose: () => void
   /** 누적 실패 횟수. 숫자가 안 오는 실패도 있어 없을 수 있다. */
   failedCount?: number
-  /** 잠기는 기준. 시안은 10 이지만 값은 서버가 정한다. */
+  /** 잠기는 기준. 401 에 실려 올 때만 값이 있고, 없으면 정책 상수를 쓴다. */
   maxCount?: number
 }) {
   const title = failedCount === undefined ? '로그인 실패' : `로그인 ${failedCount}회 실패`
@@ -32,7 +39,7 @@ export function LoginFailedDialog({
   return (
     <Modal open={open} onClose={onClose} label={title}>
       <ModalHeading title={title}>
-        <p>{maxCount === undefined ? '여러 번' : `${maxCount}회`} 실패시 계정이 잠금 상태로</p>
+        <p>{maxCount ?? MAX_LOGIN_ATTEMPTS}회 실패시 계정이 잠금 상태로</p>
         <p>설정되고 이메일을 통해 비밀번호를 재설정 해야합니다.</p>
       </ModalHeading>
 
@@ -48,7 +55,7 @@ type AccountLockedDialogProps = {
   onClose: () => void
   /** 로그인 화면에서 입력했던 이메일. 다시 치지 않도록 채워 준다. */
   defaultEmail?: string
-  /** 잠기는 기준 횟수. 없으면 숫자를 뺀 문구로 대신한다. */
+  /** 잠기는 기준 횟수. 없으면 정책 상수를 쓴다. */
   maxCount?: number
 }
 
@@ -93,8 +100,7 @@ export function AccountLockedDialog({
       <div className="flex w-full flex-col items-center gap-4 text-center">
         <ModalHeading title="비밀번호 재설정">
           <p>
-            로그인을 {maxCount === undefined ? '여러 번' : `${maxCount}회`} 실패하여 계정이
-            잠겼습니다.
+            로그인을 {maxCount ?? MAX_LOGIN_ATTEMPTS}회 실패하여 계정이 잠겼습니다.
           </p>
           <p>이메일로 비밀번호 재설정 링크가 발송됩니다.</p>
         </ModalHeading>

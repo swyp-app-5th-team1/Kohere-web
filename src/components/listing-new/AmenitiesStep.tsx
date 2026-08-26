@@ -2,78 +2,51 @@ import { Chip, ChipGroup } from '../form/Chip'
 import { Field } from '../form/Field'
 import { StepFooter } from './StepFooter'
 import { StepTitle } from './StepTitle'
-
-/**
- * 시안에 그려진 순서 그대로다. "안전 시설" 과 "제공 비품" 뒤쪽에 주방 항목(토스트기 ·
- * 커피머신 · 정수기)이 다시 나오는데, 시안 그대로 옮겨 두었으니 확인이 필요하다.
- */
-const AMENITY_GROUPS: { label: string; items: string[] }[] = [
-  { label: '난방 시설', items: ['중앙 난방', '개별 난방'] },
-  { label: '세탁 시설', items: ['세탁기', '건조기', '건조대', '다리미'] },
-  {
-    label: '주방 시설',
-    items: [
-      '공용 냉장고',
-      '인덕션',
-      '가스레인지',
-      '전자레인지',
-      '전기포트',
-      '전기밥솥',
-      '토스트기',
-      '커피머신',
-      '정수기',
-    ],
-  },
-  {
-    label: '생활 시설',
-    items: ['WIFI', 'TV', '소파', '공용에어컨', '운동기구', '프로젝터', '공기청정기', '공용PC', '정수기'],
-  },
-  {
-    label: '안전 시설',
-    items: [
-      'CCTV',
-      '공동현관 도어락',
-      '방별 도어락',
-      '소화기',
-      '화재경보기',
-      '경비원',
-      '토스트기',
-      '커피머신',
-      '정수기',
-    ],
-  },
-  {
-    label: '공용 공간',
-    items: ['공용 주방', '공용 화장실', '공용 샤워실', '라운지', '스터디룸', '회의실', '옥상'],
-  },
-  {
-    label: '제공 비품',
-    items: ['침구류', '세탁세제', '조미료', '휴지', '수건', '전기밥솥', '토스트기', '커피머신', '정수기'],
-  },
-  { label: '주변 편의 시설', items: ['편의점', '공원', '마트/슈퍼마켓', '세탁소', '병원/약국'] },
-]
+import {
+  FACILITY_GROUPS,
+  FACILITY_NONE,
+  facilityKey,
+  selectedCodes,
+  type FacilityGroupKey,
+} from './facilities'
 
 type AmenitiesStepProps = {
-  /** 같은 이름이 다른 그룹에도 있어서 "그룹명/순번/항목" 으로 구분해 담는다. */
+  /** 「그룹키:코드」 목록. 제출할 때 그룹별로 갈라 담는다. */
   value: string[]
   onChange: (next: string[]) => void
   onPrev: () => void
   onNext: () => void
 }
 
-const groupKey = (groupLabel: string, index: number, item: string) =>
-  `${groupLabel}/${index}/${item}`
-
-/** 매물 등록 4단계 — 편의 시설. 모든 항목이 중복 선택이다. */
+/**
+ * 매물 등록 4단계 — 편의 시설.
+ *
+ * 여덟 그룹 모두 최소 하나를 골라야 한다. 해당 시설이 아예 없는 건물도 있으므로 「없음」이
+ * 그 자리를 맡는다 — 서버도 같은 규칙이라, 없으면 `["NONE"]` 하나만 보내야 하고 다른
+ * 코드와 섞으면 400 이다. 그래서 화면에서도 「없음」과 나머지를 서로 밀어낸다.
+ */
 export function AmenitiesStep({ value, onChange, onPrev, onNext }: AmenitiesStepProps) {
-  const toggle = (key: string) => {
-    onChange(value.includes(key) ? value.filter((item) => item !== key) : [...value, key])
+  /** 「없음」을 고르면 그 그룹의 나머지를 지우고, 다른 걸 고르면 「없음」을 지운다. */
+  function toggle(group: FacilityGroupKey, code: string) {
+    const key = facilityKey(group, code)
+
+    if (value.includes(key)) {
+      onChange(value.filter((item) => item !== key))
+      return
+    }
+
+    const others = value.filter((item) => !item.startsWith(`${group}:`))
+    const kept =
+      code === FACILITY_NONE
+        ? others
+        : [...others, ...selectedCodes(value, group)
+            .filter((picked) => picked !== FACILITY_NONE)
+            .map((picked) => facilityKey(group, picked))]
+
+    onChange([...kept, key])
   }
 
-  // 어떤 항목이 필수인지 아직 안 정해져서, 우선 그룹마다 하나씩은 고르게 해 뒀다.
-  const filled = AMENITY_GROUPS.every((group) =>
-    group.items.some((item, index) => value.includes(groupKey(group.label, index, item))),
-  )
+  const filled = FACILITY_GROUPS.every((group) => selectedCodes(value, group.key).length > 0)
 
   return (
     <>
@@ -82,21 +55,33 @@ export function AmenitiesStep({ value, onChange, onPrev, onNext }: AmenitiesStep
           <StepTitle>숙소에 갖춰진 편의 시설을 선택해주세요.</StepTitle>
 
           <div className="flex w-full flex-col gap-6">
-            {AMENITY_GROUPS.map((group) => (
-              <Field key={group.label} label={group.label}>
-                <ChipGroup>
-                  {group.items.map((item, index) => {
-                    const key = groupKey(group.label, index, item)
+            {FACILITY_GROUPS.map((group) => {
+              const picked = selectedCodes(value, group.key)
 
-                    return (
-                      <Chip key={key} selected={value.includes(key)} onClick={() => toggle(key)}>
-                        {item}
+              return (
+                <Field key={group.key} label={group.label}>
+                  <ChipGroup>
+                    {/* 시안대로 「없음」이 맨 앞이다. */}
+                    <Chip
+                      selected={picked.includes(FACILITY_NONE)}
+                      onClick={() => toggle(group.key, FACILITY_NONE)}
+                    >
+                      없음
+                    </Chip>
+
+                    {group.items.map((item) => (
+                      <Chip
+                        key={item.code}
+                        selected={picked.includes(item.code)}
+                        onClick={() => toggle(group.key, item.code)}
+                      >
+                        {item.label}
                       </Chip>
-                    )
-                  })}
-                </ChipGroup>
-              </Field>
-            ))}
+                    ))}
+                  </ChipGroup>
+                </Field>
+              )
+            })}
           </div>
         </div>
       </main>

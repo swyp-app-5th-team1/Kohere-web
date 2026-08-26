@@ -6,8 +6,9 @@ import type { SpaceType } from './spaceTypes'
  * 원래는 서버가 임시 저장본을 들고 있는 그림이었지만, 서버 작업이 늘어나서 일단 브라우저에
  * 둔다. 저장 시점은 각 단계에서 "다음" 을 누르는 순간이다 (입력할 때마다 쓰지 않는다).
  *
- * 사진은 File 객체라 JSON 으로 담을 수 없어 여기 넣지 않는다. 새로고침하면 사진만 사라진다.
- * 사진까지 살리려면 업로드 API 가 생긴 뒤 서버 URL 을 받아서 담아야 한다.
+ * 사진은 고르는 즉시 서버로 올리고 그때 받은 key · url 만 담는다. 둘 다 문자열이라
+ * JSON 으로 저장되고, 그래서 새로고침해도 사진이 살아남는다. 올리는 중이거나 실패한
+ * 사진은 File 이 있어야 다시 시도할 수 있는데 File 은 담기지 않아 제외한다.
  */
 
 const DRAFT_KEY = 'kohere.listingDraft'
@@ -46,6 +47,7 @@ export type BranchDraft = {
 }
 
 export type BuildingDraft = {
+  /** 서버 코드(`VILLA` 등)를 담는다. 화면 라벨은 buildingTypes.ts 가 짝지어 준다. */
   buildingType: string
   totalFloors: string
   operatingFloors: string
@@ -95,11 +97,29 @@ export type ListingDraft = {
   branch: BranchDraft
   building: BuildingDraft
   conditions: ConditionsDraft
-  /** 편의 시설은 "그룹명/순번/항목" 형태의 키로 담는다. */
+  /** 편의 시설은 "그룹키:코드" 형태로 담는다. */
   amenities: string[]
   roomTypes: RoomTypeDraft[]
   survey: SurveyDraft
   contact: ContactDraft
+  /** 지점 대표사진. 첫 장이 대표라 순서가 그대로 등록 요청에 실린다. */
+  branchPhotos: StoredPhoto[]
+  /** 방 타입 id 별 객실 사진. */
+  roomPhotos: Record<string, StoredPhoto[]>
+}
+
+/**
+ * 임시 저장에 담는 사진.
+ *
+ * 업로드를 마친 것만 담는다 — 올리는 중이거나 실패한 사진은 `File` 이 있어야 다시 시도할
+ * 수 있는데 File 은 JSON 으로 담기지 않는다. 서버에 올라간 사진은 7일간 살아 있어서,
+ * 새로고침해도 key 만 들고 있으면 그대로 쓸 수 있다.
+ */
+export type StoredPhoto = {
+  id: string
+  /** 서버가 준 미리보기 주소. 등록이 끝나면 무효가 되지만 폼을 쓰는 동안은 유효하다. */
+  url: string
+  key: string
 }
 
 export function createRoomType(): RoomTypeDraft {
@@ -156,6 +176,8 @@ export function emptyDraft(): ListingDraft {
       agreedPrivacy: false,
       agreedExposure: false,
     },
+    branchPhotos: [],
+    roomPhotos: {},
   }
 }
 
@@ -180,6 +202,8 @@ export function loadDraft(): ListingDraft {
       roomTypes,
       survey: { ...empty.survey, ...saved.survey },
       contact: { ...empty.contact, ...saved.contact },
+      branchPhotos: saved.branchPhotos ?? [],
+      roomPhotos: saved.roomPhotos ?? {},
     }
   } catch {
     // 값이 깨졌거나 localStorage 를 못 쓰는 환경이면 빈 상태로 시작한다.

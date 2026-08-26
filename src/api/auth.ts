@@ -47,9 +47,18 @@ export async function login(
 export type LoginAttempts = {
   /** 지금까지 누적된 연속 실패 횟수. */
   failed: number
-  /** 잠기는 기준. 시안 기준 10 이다. */
+  /** 잠기는 기준. */
   max: number
 }
+
+/**
+ * 잠금 기준 횟수 (시안 224:30719 · 224:30728).
+ *
+ * 계정마다 다른 값이 아니라 정책 상수라 화면에 박아 둔다. 401 에 실려 오면 그 값을 쓰고,
+ * 잠긴 뒤(423)처럼 안 실려 오는 응답에서는 이 값으로 문구를 채운다.
+ * 정책이 바뀌면 여기 하나만 고치면 된다.
+ */
+export const MAX_LOGIN_ATTEMPTS = 10
 
 export function loginAttempts(error: unknown): LoginAttempts | null {
   if (!(error instanceof ApiError)) return null

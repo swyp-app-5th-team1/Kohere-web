@@ -4,9 +4,8 @@ import { PhotoPicker, type Photo } from '../form/PhotoPicker'
 import { TextField } from '../form/TextField'
 import { StepFooter } from './StepFooter'
 import { StepTitle } from './StepTitle'
+import { BUILDING_TYPES } from './buildingTypes'
 import type { BuildingDraft } from './draft'
-
-const BUILDING_TYPES = ['상가건물', '단독건물', '빌라/연립', '주상복합', '단독주택', '오피스텔']
 
 type BuildingInfoStepProps = {
   value: BuildingDraft
@@ -16,6 +15,8 @@ type BuildingInfoStepProps = {
   onAddPhotos: (files: File[]) => void
   onRemovePhoto: (index: number) => void
   onMakePhotoPrimary: (index: number) => void
+  onMovePhoto: (from: number, to: number) => void
+  photoFailures: { name: string; reason: string }[]
   onPrev: () => void
   onNext: () => void
 }
@@ -28,6 +29,8 @@ export function BuildingInfoStep({
   onAddPhotos,
   onRemovePhoto,
   onMakePhotoPrimary,
+  onMovePhoto,
+  photoFailures,
   onPrev,
   onNext,
 }: BuildingInfoStepProps) {
@@ -48,13 +51,14 @@ export function BuildingInfoStep({
           <div className="flex w-full flex-col gap-8">
             <Field label="건물 형태">
               <ChipGroup>
+                {/* 화면에는 라벨을 보이고 담는 건 서버 코드다. buildingTypes.ts 참고. */}
                 {BUILDING_TYPES.map((type) => (
                   <Chip
-                    key={type}
-                    selected={value.buildingType === type}
-                    onClick={() => onChange({ buildingType: type })}
+                    key={type.code}
+                    selected={value.buildingType === type.code}
+                    onClick={() => onChange({ buildingType: type.code })}
                   >
-                    {type}
+                    {type.label}
                   </Chip>
                 ))}
               </ChipGroup>
@@ -127,6 +131,8 @@ export function BuildingInfoStep({
                 onAdd={onAddPhotos}
                 onRemove={onRemovePhoto}
                 onMakePrimary={onMakePhotoPrimary}
+                onMove={onMovePhoto}
+                failures={photoFailures}
               />
             </Field>
           </div>

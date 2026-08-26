@@ -40,6 +40,8 @@ type RoomTypesStepProps = {
   onAddPhotos: (roomId: string, files: File[]) => void
   onRemovePhoto: (roomId: string, index: number) => void
   onMakePhotoPrimary: (roomId: string, index: number) => void
+  onMovePhoto: (roomId: string, from: number, to: number) => void
+  photoFailures: Record<string, { name: string; reason: string }[]>
   onPrev: () => void
   onNext: () => void
 }
@@ -54,6 +56,8 @@ export function RoomTypesStep({
   onAddPhotos,
   onRemovePhoto,
   onMakePhotoPrimary,
+  onMovePhoto,
+  photoFailures,
   onPrev,
   onNext,
 }: RoomTypesStepProps) {
@@ -246,6 +250,8 @@ export function RoomTypesStep({
                       onAdd={(files) => onAddPhotos(room.id, files)}
                       onRemove={(index) => onRemovePhoto(room.id, index)}
                       onMakePrimary={(index) => onMakePhotoPrimary(room.id, index)}
+                      onMove={(from, to) => onMovePhoto(room.id, from, to)}
+                      failures={photoFailures[room.id] ?? []}
                     />
                   </Field>
                 </div>

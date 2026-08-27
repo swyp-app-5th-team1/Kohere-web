@@ -23,9 +23,7 @@ const NO_AUTH_PATHS = [
   '/api/v1/auth/email/find',
   /*
    * 이메일 찾기 전용 문자 인증. 회원가입용(phone/signup/*)과 경로가 다르고, 서버도 두
-   * 마커를 구분한다 — 가입용으로 이메일을 찾으려 하면 422 다.
-   *
-   * TODO(스펙 확정 후 연결): 요청 · 응답 형태를 아직 못 봐서 phone.ts 에 함수가 없다.
+   * 마커를 구분한다 — 가입용으로 이메일을 찾으려 하면 422 다. phone.ts 참고.
    */
   '/api/v1/auth/phone/find-email/verification-code',
   '/api/v1/auth/phone/find-email/verify',

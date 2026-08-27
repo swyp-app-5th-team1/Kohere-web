@@ -13,9 +13,7 @@ const formatToday = () => {
 type SubmittedStepProps = {
   /**
    * 서버가 발급한 매물 id. 접수 번호라는 필드가 따로 없어 이걸 그 자리에 보여 준다.
-   *
-   * TODO(기획 확인): 24자리 hex 라 시안의 `KH-2026-0142` 처럼 임대인이 불러 주기 어렵다.
-   * 짧은 접수 번호를 서버가 따로 발급할지 정해야 한다.
+   * 시안의 `KH-2026-0142` 는 예시일 뿐 포맷에 의도가 없다고 기획이 확인해 줬다(2026-08-27).
    */
   receiptNo: string | null
   onRestart: () => void

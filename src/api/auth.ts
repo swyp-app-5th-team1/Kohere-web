@@ -264,6 +264,10 @@ export function signupErrorMessage(error: unknown): string {
     case 'AUTH_PHONE_NOT_VERIFIED':
       return '휴대폰 인증이 만료되었습니다. 인증번호를 다시 받아 주세요.'
 
+    // 이메일 마커도 휴대폰과 같은 30분 정책이고, 사유를 구분해 주지 않는 것도 같다.
+    case 'AUTH_EMAIL_NOT_VERIFIED':
+      return '이메일 인증이 만료되었습니다. 인증번호를 다시 받아 주세요.'
+
     case 'AUTH_REQUIRED_AGREEMENT_MISSING':
       return '필수 약관에 동의해 주세요.'
 

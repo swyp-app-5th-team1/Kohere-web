@@ -17,6 +17,9 @@ const NO_AUTH_PATHS = [
   '/api/v1/auth/signup',
   '/api/v1/auth/phone/signup/verification-code',
   '/api/v1/auth/phone/signup/verify',
+  // 가입용 이메일 인증. 정식 사용자용(email/verification-code)과 다른 경로다.
+  '/api/v1/auth/email/signup/verification-code',
+  '/api/v1/auth/email/signup/verify',
   '/api/v1/auth/email/find',
   /*
    * 이메일 찾기 전용 문자 인증. 회원가입용(phone/signup/*)과 경로가 다르고, 서버도 두

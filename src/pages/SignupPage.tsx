@@ -11,6 +11,14 @@ import {
 } from '../api/auth'
 import { ApiError } from '../api/client'
 import {
+  EMAIL_CODE_LENGTH,
+  EMAIL_RESEND_COOLDOWN_SECONDS,
+  sendEmailCodeErrorMessage,
+  sendSignupEmailCode,
+  verifyEmailErrorMessage,
+  verifySignupEmailCode,
+} from '../api/email'
+import {
   PHONE_CODE_LENGTH,
   RESEND_COOLDOWN_SECONDS,
   sendCodeErrorMessage,
@@ -170,6 +178,99 @@ export default function SignupPage() {
     }
   }
 
+  /*
+   * 이메일 인증 상태. 휴대폰 인증과 같은 구조다 — 주소 옆 버튼이 발송·재전송을 겸하고,
+   * 인증번호 옆에 확인 버튼이 따로 있다. 연락처 인증과는 서로 순서가 무관하다.
+   */
+  const [emailCodeSent, setEmailCodeSent] = useState(false)
+  const [emailVerified, setEmailVerified] = useState(false)
+  const [sendingEmailCode, setSendingEmailCode] = useState(false)
+  const [verifyingEmailCode, setVerifyingEmailCode] = useState(false)
+  const [emailCode, setEmailCode] = useState('')
+  const [emailSendMessage, setEmailSendMessage] = useState<string | null>(null)
+  const [emailCodeMessage, setEmailCodeMessage] = useState<string | null>(null)
+
+  const [emailResendAt, setEmailResendAt] = useState<number | null>(null)
+  const [emailCodeExpiresAt, setEmailCodeExpiresAt] = useState<number | null>(null)
+
+  const emailResendIn = useCountdown(emailResendAt)
+  const emailCodeExpiresIn = useCountdown(emailCodeExpiresAt)
+
+  const email = `${emailLocal}@${emailDomain}`
+  /** 인증 메일이 도착할 수 없는 주소는 발송 전에 거른다 — 서버 규칙과 같다(auth.ts). */
+  const emailShapeOk =
+    emailLocalError(emailLocal) === null &&
+    emailDomainError(emailDomain) === null &&
+    emailFormatError(email) === null
+
+  const canSendEmailCode =
+    emailShapeOk && !sendingEmailCode && !emailVerified && emailResendIn === 0
+  const canVerifyEmailCode =
+    emailCodeSent &&
+    emailCode.length === EMAIL_CODE_LENGTH &&
+    !verifyingEmailCode &&
+    !emailVerified &&
+    emailCodeExpiresIn > 0
+
+  /**
+   * 주소를 고치면 앞서 받은 인증은 무효다. 마커가 주소 기준이라 아이디든 도메인이든
+   * 한 글자만 달라져도 다시 받아야 한다. 재발송 쿨다운은 그대로 둔다 — IP 기준 한도가
+   * 같이 걸려 있어 주소를 바꿔도 연타는 막는 게 맞다.
+   */
+  function resetEmailVerification() {
+    setEmailCodeSent(false)
+    setEmailVerified(false)
+    setEmailCode('')
+    setEmailCodeExpiresAt(null)
+    setEmailSendMessage(null)
+    setEmailCodeMessage(null)
+  }
+
+  async function handleSendEmailCode() {
+    if (!canSendEmailCode) return
+
+    setSendingEmailCode(true)
+    setEmailSendMessage(null)
+    setEmailCodeMessage(null)
+
+    try {
+      const { expiresIn } = await sendSignupEmailCode(email)
+      const now = Date.now()
+
+      setEmailCodeSent(true)
+      setEmailCodeExpiresAt(now + expiresIn * 1000)
+      setEmailResendAt(now + EMAIL_RESEND_COOLDOWN_SECONDS * 1000)
+      // 오타로 남의 주소에 보내 놓고 기다리는 걸 줄이려고 주소 확인을 함께 안내한다.
+      setEmailSendMessage('인증번호를 발송했습니다. 메일이 오지 않으면 주소를 확인해 주세요.')
+    } catch (error) {
+      // 휴대폰 발송과 같은 이유로, 429 만 재발송 간격만큼 다시 잠가 연타를 막는다.
+      if (error instanceof ApiError && error.code === 'TOO_MANY_REQUESTS') {
+        setEmailResendAt(Date.now() + EMAIL_RESEND_COOLDOWN_SECONDS * 1000)
+      }
+
+      setEmailSendMessage(sendEmailCodeErrorMessage(error))
+    } finally {
+      setSendingEmailCode(false)
+    }
+  }
+
+  async function handleVerifyEmailCode() {
+    if (!canVerifyEmailCode) return
+
+    setVerifyingEmailCode(true)
+    setEmailCodeMessage(null)
+
+    try {
+      const { verified } = await verifySignupEmailCode(email, emailCode)
+      setEmailVerified(verified)
+      setEmailCodeMessage(verified ? '인증이 완료되었습니다.' : '인증에 실패했습니다.')
+    } catch (error) {
+      setEmailCodeMessage(verifyEmailErrorMessage(error))
+    } finally {
+      setVerifyingEmailCode(false)
+    }
+  }
+
   /**
    * 칸을 벗어날 때 본다. 치는 도중에 보면 이메일을 한 글자 쳤을 뿐인데 형식이 틀렸다고
    * 혼내게 된다. 다 쓰고 나갈 때 알려주는 게 맞다.
@@ -212,7 +313,6 @@ export default function SignupPage() {
     // 인증 없이 제출하면 서버가 422 로 막는다. 여기서 먼저 걸러 준다.
     if (!phoneVerified) found.phone = '휴대폰 인증을 완료해 주세요.'
 
-    const email = `${emailLocal}@${emailDomain}`
     const localError = emailLocalError(emailLocal)
     const domainError = emailDomainError(emailDomain)
     if (localError) found.email = localError
@@ -221,6 +321,10 @@ export default function SignupPage() {
     if (!localError && !domainError) {
       const wholeError = emailFormatError(email)
       if (wholeError) found.email = wholeError
+    }
+    // 인증 없이 제출하면 서버가 422 로 막는다. 휴대폰과 같은 규칙이다.
+    if (!found.email && !found.emailDomain && !emailVerified) {
+      found.email = '이메일 인증을 완료해 주세요.'
     }
 
     const passwordError = passwordPolicyError(password)
@@ -269,6 +373,7 @@ export default function SignupPage() {
   }
 
   function handleDomainSelect(value: string) {
+    resetEmailVerification()
     if (value === '__custom__') {
       setCustomDomain(true)
       setEmailDomain('')
@@ -405,81 +510,154 @@ export default function SignupPage() {
               </div>
             </div>
 
-            {/* 이메일 주소 */}
-            <Field label="이메일 주소">
-              <div className="flex w-full flex-wrap items-center gap-5">
-                <input
-                  type="text"
-                  autoComplete="username"
-                  placeholder="이메일 주소"
-                  value={emailLocal}
-                  onChange={(e) => {
-                    setEmailLocal(e.target.value)
-                    revalidate('email', emailLocalError(e.target.value))
-                  }}
-                  onBlur={() => checkOnBlur('email', emailLocalError(emailLocal))}
-                  className={`${fieldErrors.email ? errorFieldClass : fieldClass} min-w-[200px] flex-1`}
-                />
-                <span className="text-cool-neutral-80 w-11 shrink-0 p-3 text-center text-[22px] leading-7 font-medium">
-                  @
-                </span>
-                {customDomain ? (
-                  <div className="relative w-full md:w-[380px]">
-                    <input
-                      type="text"
-                      placeholder="도메인 입력"
-                      autoFocus
-                      value={emailDomain}
-                      onChange={(e) => {
-                        setEmailDomain(e.target.value)
-                        revalidate('emailDomain', emailDomainError(e.target.value))
-                      }}
-                      onBlur={() => checkOnBlur('emailDomain', emailDomainError(emailDomain))}
-                      className={`${fieldErrors.emailDomain ? errorFieldClass : fieldClass} pr-12`}
-                    />
-                    <button
-                      type="button"
-                      aria-label="도메인 목록에서 선택"
-                      onClick={() => {
-                        setCustomDomain(false)
-                        setEmailDomain('')
-                      }}
-                      className="absolute top-1/2 right-4 -translate-y-1/2"
-                    >
-                      <img src={chevronUrl} alt="" className="size-6" />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="relative w-full md:w-[380px]">
-                    <select
-                      aria-label="이메일 도메인"
-                      value={emailDomain}
-                      onChange={(e) => handleDomainSelect(e.target.value)}
-                      className={`${fieldClass} appearance-none pr-12 ${emailDomain === '' ? 'text-cool-neutral-10' : ''}`}
-                    >
-                      <option value="" disabled>
-                        직접입력
-                      </option>
-                      {EMAIL_DOMAINS.map((domain) => (
-                        <option key={domain} value={domain}>
-                          {domain}
+            {/* 이메일 주소 + 인증. 휴대폰과 같은 구조 — 주소 옆 전송, 인증번호 옆 확인. */}
+            <div className="flex flex-col gap-5">
+              <Field label="이메일 주소">
+                <div className="flex w-full flex-wrap items-center gap-5">
+                  <input
+                    type="text"
+                    autoComplete="username"
+                    placeholder="이메일 주소"
+                    value={emailLocal}
+                    disabled={emailVerified}
+                    onChange={(e) => {
+                      setEmailLocal(e.target.value)
+                      resetEmailVerification()
+                      revalidate('email', emailLocalError(e.target.value))
+                    }}
+                    onBlur={() => checkOnBlur('email', emailLocalError(emailLocal))}
+                    className={`${fieldErrors.email ? errorFieldClass : fieldClass} min-w-[200px] flex-1`}
+                  />
+                  <span className="text-cool-neutral-80 w-11 shrink-0 p-3 text-center text-[22px] leading-7 font-medium">
+                    @
+                  </span>
+                  {customDomain ? (
+                    <div className="relative w-full md:w-[380px]">
+                      <input
+                        type="text"
+                        placeholder="도메인 입력"
+                        autoFocus
+                        value={emailDomain}
+                        disabled={emailVerified}
+                        onChange={(e) => {
+                          setEmailDomain(e.target.value)
+                          resetEmailVerification()
+                          revalidate('emailDomain', emailDomainError(e.target.value))
+                        }}
+                        onBlur={() => checkOnBlur('emailDomain', emailDomainError(emailDomain))}
+                        className={`${fieldErrors.emailDomain ? errorFieldClass : fieldClass} pr-12`}
+                      />
+                      <button
+                        type="button"
+                        aria-label="도메인 목록에서 선택"
+                        onClick={() => {
+                          resetEmailVerification()
+                          setCustomDomain(false)
+                          setEmailDomain('')
+                        }}
+                        className="absolute top-1/2 right-4 -translate-y-1/2"
+                      >
+                        <img src={chevronUrl} alt="" className="size-6" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="relative w-full md:w-[380px]">
+                      <select
+                        aria-label="이메일 도메인"
+                        value={emailDomain}
+                        disabled={emailVerified}
+                        onChange={(e) => handleDomainSelect(e.target.value)}
+                        className={`${fieldClass} appearance-none pr-12 ${emailDomain === '' ? 'text-cool-neutral-10' : ''}`}
+                      >
+                        <option value="" disabled>
+                          직접입력
                         </option>
-                      ))}
-                      <option value="__custom__">직접입력</option>
-                    </select>
-                    <img
-                      src={chevronUrl}
-                      alt=""
-                      className="pointer-events-none absolute top-1/2 right-4 size-6 -translate-y-1/2"
-                    />
-                  </div>
+                        {EMAIL_DOMAINS.map((domain) => (
+                          <option key={domain} value={domain}>
+                            {domain}
+                          </option>
+                        ))}
+                        <option value="__custom__">직접입력</option>
+                      </select>
+                      <img
+                        src={chevronUrl}
+                        alt=""
+                        className="pointer-events-none absolute top-1/2 right-4 size-6 -translate-y-1/2"
+                      />
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleSendEmailCode}
+                    disabled={!canSendEmailCode}
+                    className="bg-label-normal disabled:bg-cool-neutral-20 h-14 w-[120px] shrink-0 rounded-xl px-3 text-sm leading-5 font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed md:w-[158px]"
+                  >
+                    {emailVerified
+                      ? '인증완료'
+                      : sendingEmailCode
+                        ? '발송 중…'
+                        : emailResendIn > 0
+                          ? `재전송 ${emailResendIn}초`
+                          : emailCodeSent
+                            ? '재전송'
+                            : '인증번호 전송'}
+                  </button>
+                </div>
+                {/* 앞칸·뒷칸 중 틀린 쪽 문구를 보여준다. 둘 다면 앞칸부터. */}
+                {fieldErrors.email || fieldErrors.emailDomain ? (
+                  <FieldError>{fieldErrors.email ?? fieldErrors.emailDomain}</FieldError>
+                ) : (
+                  emailSendMessage && (
+                    <span className="text-cool-neutral-40 px-2 text-xs leading-4">
+                      {emailSendMessage}
+                    </span>
+                  )
+                )}
+              </Field>
+
+              <div className="flex w-full flex-col gap-1">
+                <div className="flex w-full items-start gap-5">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={EMAIL_CODE_LENGTH}
+                    aria-label="이메일 인증번호"
+                    placeholder={`인증번호 ${EMAIL_CODE_LENGTH}자리`}
+                    value={emailCode}
+                    onChange={(e) => setEmailCode(e.target.value.replace(/\D/g, ''))}
+                    disabled={!emailCodeSent || emailVerified}
+                    className={`${fieldClass} min-w-0 flex-1`}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleVerifyEmailCode}
+                    disabled={!canVerifyEmailCode}
+                    className="bg-label-normal disabled:bg-cool-neutral-20 h-14 w-[120px] shrink-0 rounded-xl px-3 text-sm leading-5 font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed md:w-[158px]"
+                  >
+                    {verifyingEmailCode ? '확인 중…' : '확인'}
+                  </button>
+                </div>
+                {/* 남은 시간은 안내용이다. 실제 만료 판정은 서버가 한다 — 휴대폰과 같다. */}
+                {emailCodeSent && !emailVerified && (
+                  <span className="text-cool-neutral-40 px-1 text-xs leading-5">
+                    {emailCodeExpiresIn > 0
+                      ? `남은 시간 ${formatSeconds(emailCodeExpiresIn)}`
+                      : '인증번호 유효시간이 지났습니다. 다시 받아 주세요.'}
+                  </span>
+                )}
+
+                {emailCodeMessage && (
+                  <span
+                    className={
+                      'px-1 text-xs leading-5 ' +
+                      (emailVerified ? 'text-cool-neutral-40' : 'text-red-600')
+                    }
+                  >
+                    {emailCodeMessage}
+                  </span>
                 )}
               </div>
-              {/* 앞칸·뒷칸 중 틀린 쪽 문구를 보여준다. 둘 다면 앞칸부터. */}
-              {(fieldErrors.email || fieldErrors.emailDomain) && (
-                <FieldError>{fieldErrors.email ?? fieldErrors.emailDomain}</FieldError>
-              )}
-            </Field>
+            </div>
 
             {/* 비밀번호 */}
             <Field label="비밀번호">

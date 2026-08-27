@@ -134,7 +134,6 @@ export function buildListingRequest(
   if (branch.lat === null || branch.lng === null || branch.nearestTransit === null) return null
   if (phone === null || businessRegistrationNumber.length !== 10) return null
   if (imageKeys.length === 0) return null
-  if (!contact.agreedPrivacy || !contact.agreedExposure) return null
 
   const roomOffers = draft.roomTypes.map((room) => roomOfferOf(room, roomPhotos))
   if (roomOffers.length === 0 || roomOffers.some((offer) => offer === null)) return null
@@ -175,9 +174,14 @@ export function buildListingRequest(
     preferredNationalities: survey.nationalities,
     contractDifficulties: survey.difficulties,
     serviceFeedback: survey.message.trim() === '' ? null : survey.message.trim(),
+    /*
+     * 동의 체크박스는 화면에서 뺐다(2026-08-28, 팀 확정 — 받을 필요가 없다).
+     * 요청 스키마에는 필수 필드로 남아 있어서, 백엔드가 필드를 지울 때까지 true 로 채운다.
+     * 지우면 이 블록과 ListingRequest 타입에서 같이 걷어낸다.
+     */
     consents: {
-      privacyPolicyAgreed: contact.agreedPrivacy,
-      listingExposureAgreed: contact.agreedExposure,
+      privacyPolicyAgreed: true,
+      listingExposureAgreed: true,
     },
   }
 }

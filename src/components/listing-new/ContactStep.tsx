@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react'
 import { useState } from 'react'
 import {
   businessVerifyErrorMessage,
@@ -6,7 +5,6 @@ import {
   verifyBusinessNumber,
 } from '../../api/business'
 import { ApiError } from '../../api/client'
-import { DOCUMENT_URLS } from '../../constants/documents'
 import { Field, FieldError, inputClass, inputErrorClass } from '../form/Field'
 import { FormattedInput } from '../form/FormattedInput'
 import { TextField } from '../form/TextField'
@@ -40,33 +38,14 @@ type VerifyState = {
   message?: string
 }
 
-/** 시안의 네모 체크박스 (16px · radius 2 · 테두리 #999). */
-function CheckBox({
-  checked,
-  onChange,
-  children,
-}: {
-  checked: boolean
-  onChange: (next: boolean) => void
-  children: ReactNode
-}) {
-  return (
-    <label className="flex cursor-pointer items-center gap-2.5">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
-        className="border-neutral-30 accent-primary-50 size-4 shrink-0 rounded-[2px] border"
-      />
-      <span className="text-neutral-70 text-base leading-6">{children}</span>
-    </label>
-  )
-}
-
-/** 매물 등록 7단계 — 연락처와 약관 동의. */
+/**
+ * 매물 등록 7단계 — 연락처.
+ *
+ * 시안에 있던 동의 체크박스 두 개(개인정보 · 매물 노출)는 받지 않기로 팀이
+ * 정했다(2026-08-28). 문구도 본문 문서도 함께 없어졌다.
+ */
 export function ContactStep({ value, onChange, onPrev, onNext }: ContactStepProps) {
   const touched = useTouched()
-  const allAgreed = value.agreedPrivacy && value.agreedExposure
 
   const [verify, setVerify] = useState<VerifyState | null>(null)
   const businessDigits = value.businessNumber.replace(/\D/g, '')
@@ -133,8 +112,7 @@ export function ContactStep({ value, onChange, onPrev, onNext }: ContactStepProp
     value.managerName.trim() !== '' &&
     isPhoneComplete(value.phone) &&
     isBusinessNumberComplete(value.businessNumber) &&
-    !verifyBlocked &&
-    allAgreed
+    !verifyBlocked
 
   return (
     <>
@@ -205,54 +183,6 @@ export function ContactStep({ value, onChange, onPrev, onNext }: ContactStepProp
               </span>
             </Field>
 
-            <div className="border-line-normal flex w-full flex-col gap-3 rounded-2xl border bg-white p-4">
-              <CheckBox
-                checked={allAgreed}
-                onChange={(next) => onChange({ agreedPrivacy: next, agreedExposure: next })}
-              >
-                아래 항목에 모두 동의합니다.
-              </CheckBox>
-
-              <div className="border-line-normal w-full border-t" />
-
-              <div className="flex w-full items-center justify-between">
-                <CheckBox
-                  checked={value.agreedPrivacy}
-                  onChange={(next) => onChange({ agreedPrivacy: next })}
-                >
-                  개인정보 수집·이용 동의 (필수)
-                </CheckBox>
-                {/*
-                  회원가입이 쓰는 개인정보 문서와 같은 곳으로 연결한다. 매물 등록에서 새로
-                  걷는 항목(사업자번호 등)이 있어 별도 문서가 맞다면 기획이 정해 주는 대로
-                  주소만 바꾼다.
-                */}
-                <a
-                  href={DOCUMENT_URLS.privacyPolicy}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-neutral-50 cursor-pointer text-base leading-6 font-medium"
-                >
-                  보기
-                </a>
-              </div>
-
-              <div className="flex w-full items-center justify-between">
-                <CheckBox
-                  checked={value.agreedExposure}
-                  onChange={(next) => onChange({ agreedExposure: next })}
-                >
-                  매물 정보 제공 및 노출 동의 (필수)
-                </CheckBox>
-                {/* TODO(기획 확인): 이 동의의 본문 문서가 아직 없다. 나오면 위처럼 링크로 잇는다. */}
-                <button
-                  type="button"
-                  className="text-neutral-50 cursor-pointer text-base leading-6 font-medium"
-                >
-                  보기
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       </StepBody>

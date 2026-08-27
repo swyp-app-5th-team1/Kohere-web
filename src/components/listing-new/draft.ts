@@ -86,8 +86,6 @@ export type ContactDraft = {
   managerName: string
   phone: string
   businessNumber: string
-  agreedPrivacy: boolean
-  agreedExposure: boolean
 }
 
 export type ListingDraft = {
@@ -173,8 +171,6 @@ export function emptyDraft(): ListingDraft {
       managerName: '',
       phone: '',
       businessNumber: '',
-      agreedPrivacy: false,
-      agreedExposure: false,
     },
     branchPhotos: [],
     roomPhotos: {},

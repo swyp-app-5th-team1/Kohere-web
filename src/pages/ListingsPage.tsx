@@ -10,7 +10,7 @@ import { loadUserName } from '../api/tokens'
 import { fetchMyProfile } from '../api/users'
 import { AppHeader } from '../components/AppHeader'
 import { savedDraftSummary } from '../components/listing-new/draft'
-import chevronUrl from '../assets/icon-chevron-down.svg'
+import chevronRightUrl from '../assets/icon-chevron-right-small.svg'
 import plusUrl from '../assets/icon-plus.svg'
 
 /**
@@ -99,8 +99,7 @@ function CardBody({
       >
         {badge.label}
       </span>
-      {/* TODO(에셋 대기): 시안 전용 화살표 svg 를 받으면 교체한다. 지금은 chevron 회전. */}
-      <img src={chevronUrl} alt="" className="size-4 shrink-0 -rotate-90" />
+      <img src={chevronRightUrl} alt="" className="size-4 shrink-0" />
     </>
   )
 }

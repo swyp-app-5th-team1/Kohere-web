@@ -87,6 +87,67 @@ export function searchNearbyStations(
   return api.get<Items<StationCandidate>>(`${STATION_NEARBY_PATH}?${query}`)
 }
 
+/*
+ * 내 매물 목록. `/api/v2/listings/mine` 이 아닌 이유는 공개 검색 매처
+ * (`GET /api/v2/listings/*` permitAll)에 먼저 잡혀 비로그인에 열리기 때문이다.
+ */
+const MY_LISTINGS_PATH = '/api/v2/users/me/listings'
+
+/** 카드 상태 배지. 서버가 번역 없이 코드 문자열 그대로 주므로 한글은 화면이 붙인다. */
+export type MyListingStatus = 'PENDING' | 'PUBLISHED' | 'REJECTED' | 'UPDATE_PENDING'
+
+export type MyListingEntry = {
+  /** 세입자 목록 카드와 같은 구조. 카드에 쓰는 값만 추려 담았다. */
+  listing: {
+    listingId: string
+    title: string
+    type: { code: string; label: string }
+    status: MyListingStatus
+    /** 첫 값이 대표 이미지다. */
+    imageUrls: string[]
+  }
+  /** 반려된 매물에만 있고, 그 외에는 null 이 아니라 필드 자체가 생략된다. */
+  rejectionReason?: string
+}
+
+export type MyListingsResult = {
+  content: MyListingEntry[]
+  page: {
+    number: number
+    size: number
+    totalPages: number
+    /** 상태 필터와 무관한 내 매물 총 개수. 「N건을 관리 중입니다」에 그대로 쓴다. */
+    totalElements: number
+    hasNext: boolean
+  }
+}
+
+/**
+ * 내 매물을 전부 받는다. 정렬은 최근 수정순(updatedAt 내림차순) 고정이다.
+ *
+ * 페이지 UI 가 시안에 없어서 최대 크기(100)로 한 번에 받는다. 임대인이 100건을 넘는 일은
+ * 사실상 없고, 넘으면 hasNext 로 알 수 있으니 그때 안내 문구만 붙인다.
+ */
+export function fetchMyListings(): Promise<MyListingsResult> {
+  return api.get<MyListingsResult>(`${MY_LISTINGS_PATH}?size=100`)
+}
+
+/** 목록 조회 실패 문구. */
+export function myListingsErrorMessage(error: unknown): string {
+  if (!(error instanceof ApiError)) {
+    return '매물 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'
+  }
+
+  switch (error.code) {
+    case 'FORBIDDEN':
+    case 'AUTH_ONBOARDING_REQUIRED':
+      return '임대인 계정으로 로그인해야 매물을 볼 수 있습니다.'
+
+    default:
+      return '매물 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'
+  }
+}
+
 const CREATE_PATH = '/api/v2/listings'
 
 /**

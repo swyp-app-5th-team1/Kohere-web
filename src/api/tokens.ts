@@ -11,6 +11,8 @@ import type { AuthTokens } from './types'
  */
 const ACCESS_KEY = 'kohere.accessToken'
 const TYPE_KEY = 'kohere.tokenType'
+/** 「김OO님, 안녕하세요」 인사에 쓰는 이름. 로그인 응답의 name 을 담아 둔다. */
+const NAME_KEY = 'kohere.userName'
 
 /** refresh 를 본문으로 받던 시절에 쓰던 키. 남아 있으면 지우기만 한다. */
 const LEGACY_REFRESH_KEY = 'kohere.refreshToken'
@@ -35,5 +37,16 @@ export function saveTokens(tokens: AuthTokens): void {
 export function clearTokens(): void {
   localStorage.removeItem(ACCESS_KEY)
   localStorage.removeItem(TYPE_KEY)
+  localStorage.removeItem(NAME_KEY)
   localStorage.removeItem(LEGACY_REFRESH_KEY)
+}
+
+/** 로그인 응답의 이름을 담아 둔다. 아직 이름이 없는 계정은 null 이라 지우기만 한다. */
+export function saveUserName(name: string | null): void {
+  if (name) localStorage.setItem(NAME_KEY, name)
+  else localStorage.removeItem(NAME_KEY)
+}
+
+export function loadUserName(): string | null {
+  return localStorage.getItem(NAME_KEY)
 }

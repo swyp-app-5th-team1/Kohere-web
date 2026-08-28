@@ -1,5 +1,5 @@
 import { ApiError, api } from './client'
-import { clearTokens, saveTokens } from './tokens'
+import { clearTokens, saveTokens, saveUserName } from './tokens'
 import type { AuthTokens } from './types'
 
 /** 임대인 웹 로그인. client.ts 의 NO_AUTH_PATHS 에도 같은 경로가 들어 있다. */
@@ -34,6 +34,7 @@ export async function login(
 ): Promise<LoginResponse> {
   const result = await api.post<LoginResponse>(LOGIN_PATH, { email, password })
   saveTokens(result)
+  saveUserName(result.name)
   return result
 }
 

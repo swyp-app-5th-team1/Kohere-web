@@ -177,28 +177,6 @@ export function emptyDraft(): ListingDraft {
   }
 }
 
-/**
- * 매물 목록 화면이 「작성 중」 카드를 그릴 때 쓰는 요약.
- *
- * 등록 화면 밖에서 draft 전체를 되살릴 필요는 없어서 카드에 쓰는 값만 꺼낸다.
- * 저장본이 없으면 null 이다.
- */
-export function savedDraftSummary(): { step: number; title: string; photoUrl: string | null } | null {
-  try {
-    const raw = localStorage.getItem(DRAFT_KEY)
-    if (!raw) return null
-
-    const saved = JSON.parse(raw) as Partial<ListingDraft>
-    return {
-      step: saved.step ?? 0,
-      title: saved.branch?.name?.trim() || '작성 중인 매물',
-      photoUrl: saved.branchPhotos?.[0]?.url ?? null,
-    }
-  } catch {
-    return null
-  }
-}
-
 export function loadDraft(): ListingDraft {
   const empty = emptyDraft()
 

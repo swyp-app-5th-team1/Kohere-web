@@ -9,7 +9,6 @@ import {
 import { loadUserName } from '../api/tokens'
 import { fetchMyProfile } from '../api/users'
 import { AppHeader } from '../components/AppHeader'
-import { savedDraftSummary } from '../components/listing-new/draft'
 import chevronRightUrl from '../assets/icon-chevron-right-small.svg'
 import plusUrl from '../assets/icon-plus.svg'
 
@@ -24,45 +23,19 @@ const STATUS_BADGES: Record<MyListingStatus, { label: string; className: string 
   UPDATE_PENDING: { label: '수정신청', className: 'bg-[#e8f1fd] text-[#165abd]' },
 }
 
-/** 작성 중 카드의 배지. 심사대기와 같은 회색 계열을 쓴다. */
-const DRAFT_BADGE = { label: '작성 중', className: 'bg-[#e1e2e4] text-[#505050]' }
-
-/** 작성 중 카드의 부제. draft.step 은 「다음에 이어서 쓸 단계」라 하나 앞이 마친 단계다. */
-const STEP_NAMES = [
-  '공간 유형',
-  '지점 정보',
-  '건물 정보',
-  '입주 조건',
-  '편의 시설',
-  '방 타입',
-  '추가 질문',
-  '연락처',
-  '검토',
-]
-
-function draftSubtitle(step: number): string {
-  const done = Math.min(step, STEP_NAMES.length) - 1
-  return done >= 0 ? `${STEP_NAMES[done]}까지 입력됨` : '작성 중'
-}
-
 /*
- * 카드 치수는 디자이너 확인값(2026-08-28)이다.
- * 안쪽 여백 좌우 16 · 상하 12(썸네일이 경계에서 12), 요소 사이 16.
- * 테두리는 안쪽 선(inside stroke)이라 상하 여백을 11 로 두면 전체 높이가 시안값 96 이 된다.
- * hover 는 시안 둘째 카드처럼 배경만 남고 테두리가 사라진다.
+ * 카드 치수는 피그마 원본(884×104 Hug · padding 16/12 · gap 16 · radius 16 · 안쪽 선 1)이다.
+ * 안쪽 선은 상하 여백 12 를 침범하므로 브라우저에서는 테두리 1 + 여백 11 로 옮긴다.
+ * hover 는 배경만 남고 테두리가 사라진다(시안의 회색 카드가 그 상태다).
  */
-const cardBase =
-  'flex w-full items-center gap-4 rounded-2xl border bg-white px-4 py-[11px] ' +
+const cardClass =
+  'border-line-normal flex w-full items-center gap-4 rounded-2xl border bg-white px-4 py-[11px] ' +
   'transition-colors hover:border-transparent hover:bg-cool-neutral-5'
-
-const cardClass = cardBase + ' border-line-normal'
-
-/** 작성 중 카드만 테두리가 없다. 투명 테두리로 높이는 다른 카드와 같게 유지한다. */
-const draftCardClass = cardBase + ' border-transparent'
 
 function CardThumbnail({ url }: { url: string | null }) {
   return (
-    <span className="bg-cool-neutral-7 block h-[72px] w-[100px] shrink-0 overflow-hidden rounded-xl">
+    /* 높이 80 은 카드 104 에서 역산한 값. 너비는 아직 눈대중이라 시안 확인이 필요하다. */
+    <span className="bg-cool-neutral-7 block h-[80px] w-[107px] shrink-0 overflow-hidden rounded-xl">
       {/* 만료됐거나 없는 사진은 회색 바탕만 남긴다. */}
       {url && (
         <img
@@ -89,7 +62,7 @@ function CardBody({
 }) {
   return (
     <>
-      {/* 부제는 제목에서 8, 카드 하단에서 24 — 상하 12 여백과 합치면 시안 높이(96)가 나온다. */}
+      {/* 부제는 제목에서 8. 카드 높이는 썸네일(80)과 상하 여백이 정한다. */}
       <span className="flex min-w-0 flex-1 flex-col gap-2">
         <span className="text-cool-neutral-80 truncate text-[20px] leading-6 font-semibold">
           {title}
@@ -117,9 +90,6 @@ export default function ListingsPage() {
   const [truncated, setTruncated] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // 등록 화면이 남긴 임시 저장. 서버 목록과 별개로 맨 위에 「작성 중」 카드로 얹는다.
-  const [draft] = useState(savedDraftSummary)
-
   /*
    * 인사말 이름. 캐시(로그인 때 저장한 값)를 먼저 보여 주고 프로필 API 로 맞춘다 —
    * 이름이 바뀌었거나 캐시가 생기기 전에 로그인해 둔 세션을 위해서다.
@@ -146,7 +116,7 @@ export default function ListingsPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(load, [])
 
-  const empty = entries !== null && entries.length === 0 && draft === null
+  const empty = entries !== null && entries.length === 0
 
   return (
     <div className="flex min-h-dvh flex-col bg-white">
@@ -165,9 +135,9 @@ export default function ListingsPage() {
         </main>
       )}
 
-      {/* 시안의 빈 상태 — 등록한 매물도 작성 중인 것도 없을 때만. 치수는 디자이너 확인값(2026-08-29). */}
+      {/* 시안의 빈 상태. 치수는 디자이너 확인값(2026-08-29) — 제목·부제·버튼 사이가 모두 48 이다. */}
       {error === null && empty && (
-        <main className="flex w-full flex-1 flex-col items-center justify-center gap-10 px-6">
+        <main className="flex w-full flex-1 flex-col items-center justify-center gap-12 px-6">
           <div className="flex flex-col items-center gap-12">
             <h1 className="text-[32px] leading-10 font-bold text-[#242424]">
               첫 매물을 등록해 보세요
@@ -199,18 +169,6 @@ export default function ListingsPage() {
             </div>
 
             <div className="flex w-full flex-col gap-[25px]">
-              {/* 작성 중인 매물. 누르면 등록 화면이 임시 저장을 이어서 연다. */}
-              {draft !== null && (
-                <Link to="/listings/new" className={draftCardClass}>
-                  <CardThumbnail url={draft.photoUrl} />
-                  <CardBody
-                    title={draft.title}
-                    subtitle={draftSubtitle(draft.step)}
-                    badge={DRAFT_BADGE}
-                  />
-                </Link>
-              )}
-
               {entries.map(({ listing }) => (
                 <Link
                   key={listing.listingId}

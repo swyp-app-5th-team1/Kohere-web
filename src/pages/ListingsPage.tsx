@@ -15,14 +15,17 @@ import plusUrl from '../assets/icon-plus.svg'
 
 /**
  * 상태 배지. 서버가 코드 문자열 그대로 주므로 한글과 색은 여기서 붙인다.
- * 색은 시안에서 딴 값이라 토큰이 없어 hex 로 둔다.
+ * 색은 디자이너가 준 원본 값(2026-08-28)이라 토큰 없이 hex 로 둔다.
  */
 const STATUS_BADGES: Record<MyListingStatus, { label: string; className: string }> = {
-  PUBLISHED: { label: '승인완료', className: 'bg-[#dff7ec] text-[#0da678]' },
-  PENDING: { label: '심사대기', className: 'bg-[#f1f1f3] text-[#737373]' },
-  REJECTED: { label: '반려', className: 'bg-status-red-5 text-status-red-50' },
-  UPDATE_PENDING: { label: '수정신청', className: 'bg-[#e5f0ff] text-[#3385ff]' },
+  PUBLISHED: { label: '승인완료', className: 'bg-[#ccfaed] text-[#008b64]' },
+  PENDING: { label: '심사대기', className: 'bg-[#e1e2e4] text-[#505050]' },
+  REJECTED: { label: '반려', className: 'bg-[#feece9] text-[#c60e21]' },
+  UPDATE_PENDING: { label: '수정신청', className: 'bg-[#e8f1fd] text-[#165abd]' },
 }
+
+/** 작성 중 카드의 배지. 심사대기와 같은 회색 계열을 쓴다. */
+const DRAFT_BADGE = { label: '작성 중', className: 'bg-[#e1e2e4] text-[#505050]' }
 
 /** 작성 중 카드의 부제. draft.step 은 「다음에 이어서 쓸 단계」라 하나 앞이 마친 단계다. */
 const STEP_NAMES = [
@@ -42,9 +45,14 @@ function draftSubtitle(step: number): string {
   return done >= 0 ? `${STEP_NAMES[done]}까지 입력됨` : '작성 중'
 }
 
+/*
+ * 카드 치수는 디자이너 확인값(2026-08-28)이다.
+ * 안쪽 여백 좌우 16 · 상하 12(썸네일이 경계에서 12), 요소 사이 16.
+ * hover 는 시안 둘째 카드처럼 배경만 남고 테두리가 사라진다.
+ */
 const cardClass =
-  'border-line-normal flex w-full items-center gap-5 rounded-2xl border bg-white p-4 ' +
-  'transition-colors hover:bg-cool-neutral-5'
+  'border-line-normal flex w-full items-center gap-4 rounded-2xl border bg-white px-4 py-3 ' +
+  'transition-colors hover:border-transparent hover:bg-cool-neutral-5'
 
 function CardThumbnail({ url }: { url: string | null }) {
   return (
@@ -75,18 +83,24 @@ function CardBody({
 }) {
   return (
     <>
-      <span className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className="text-neutral-70 truncate text-lg leading-6 font-semibold">{title}</span>
+      {/* 부제는 제목에서 8, 카드 하단에서 24 — 상하 12 여백과 합치면 시안 높이(96)가 나온다. */}
+      <span className="flex min-w-0 flex-1 flex-col gap-2">
+        <span className="text-cool-neutral-80 truncate text-[20px] leading-6 font-semibold">
+          {title}
+        </span>
         <span className="text-cool-neutral-30 truncate text-base leading-6">{subtitle}</span>
       </span>
+      {/* 배지는 64×24 고정. */}
       <span
         className={
-          'shrink-0 rounded-md px-2.5 py-1 text-sm leading-5 font-medium ' + badge.className
+          'flex h-6 w-16 shrink-0 items-center justify-center rounded-md text-sm leading-5 font-medium ' +
+          badge.className
         }
       >
         {badge.label}
       </span>
-      <img src={chevronUrl} alt="" className="size-6 shrink-0 -rotate-90" />
+      {/* TODO(에셋 대기): 시안 전용 화살표 svg 를 받으면 교체한다. 지금은 chevron 회전. */}
+      <img src={chevronUrl} alt="" className="size-4 shrink-0 -rotate-90" />
     </>
   )
 }
@@ -167,18 +181,19 @@ export default function ListingsPage() {
       )}
 
       {error === null && entries !== null && !empty && (
-        <main className="flex w-full flex-1 flex-col items-center px-6 py-14">
-          <div className="flex w-full max-w-[790px] flex-col gap-8">
-            <div className="flex flex-col gap-1">
+        /* 본문 폭 884, 바깥 여백 양옆 48 · 아래 56 (디자이너 확인값 2026-08-28). */
+        <main className="flex w-full flex-1 flex-col items-center px-12 py-14">
+          <div className="flex w-full max-w-[884px] flex-col gap-8">
+            <div className="flex flex-col gap-2">
               <h1 className="text-[32px] leading-10 font-bold text-[#242424]">
                 {name ? `${name}님, 안녕하세요` : '안녕하세요'}
               </h1>
-              <p className="text-cool-neutral-30 text-base leading-6">
+              <p className="text-neutral-70 text-lg leading-6">
                 등록하신 매물 {total}건을 관리 중입니다.
               </p>
             </div>
 
-            <div className="flex w-full flex-col gap-4">
+            <div className="flex w-full flex-col gap-[25px]">
               {/* 작성 중인 매물. 누르면 등록 화면이 임시 저장을 이어서 연다. */}
               {draft !== null && (
                 <Link to="/listings/new" className={cardClass}>
@@ -186,7 +201,7 @@ export default function ListingsPage() {
                   <CardBody
                     title={draft.title}
                     subtitle={draftSubtitle(draft.step)}
-                    badge={{ label: '작성 중', className: 'bg-[#f1f1f3] text-[#737373]' }}
+                    badge={DRAFT_BADGE}
                   />
                 </Link>
               )}
@@ -208,10 +223,10 @@ export default function ListingsPage() {
 
               <Link
                 to="/listings/new"
-                className="bg-secondary-5 border-cool-neutral-8 flex w-full items-center justify-center gap-3 rounded-2xl border-[1.5px] px-6 py-5 transition-colors hover:brightness-98"
+                className="bg-secondary-5 border-cool-neutral-8 flex w-full items-center justify-center gap-3 rounded-3xl border-[1.5px] px-6 py-5 transition-colors hover:brightness-98"
               >
                 <img src={plusUrl} alt="" className="size-6" />
-                <span className="text-neutral-70 text-lg leading-6 font-semibold">
+                <span className="text-neutral-70 text-[20px] leading-6 font-semibold">
                   신규 매물 등록하기
                 </span>
               </Link>

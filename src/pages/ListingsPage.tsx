@@ -7,6 +7,7 @@ import {
   type MyListingStatus,
 } from '../api/listings'
 import { loadUserName } from '../api/tokens'
+import { fetchMyProfile } from '../api/users'
 import { AppHeader } from '../components/AppHeader'
 import { savedDraftSummary } from '../components/listing-new/draft'
 import chevronUrl from '../assets/icon-chevron-down.svg'
@@ -99,7 +100,18 @@ export default function ListingsPage() {
 
   // 등록 화면이 남긴 임시 저장. 서버 목록과 별개로 맨 위에 「작성 중」 카드로 얹는다.
   const [draft] = useState(savedDraftSummary)
-  const name = loadUserName()
+
+  /*
+   * 인사말 이름. 캐시(로그인 때 저장한 값)를 먼저 보여 주고 프로필 API 로 맞춘다 —
+   * 이름이 바뀌었거나 캐시가 생기기 전에 로그인해 둔 세션을 위해서다.
+   * 인사말일 뿐이라 프로필 조회가 실패해도 아무것도 안 한다.
+   */
+  const [name, setName] = useState(loadUserName)
+  useEffect(() => {
+    fetchMyProfile()
+      .then((me) => setName(me.name))
+      .catch(() => {})
+  }, [])
 
   const load = () => {
     setError(null)

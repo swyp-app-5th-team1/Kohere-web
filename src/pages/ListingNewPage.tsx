@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { AppHeader } from '../components/AppHeader'
+import { ResumeDraftDialog } from '../components/listing-new/ResumeDraftDialog'
 import { PHOTO_MAX, type Photo } from '../components/form/PhotoPicker'
 import {
   imageRejectReason,
@@ -22,6 +23,7 @@ import { SurveyStep } from '../components/listing-new/SurveyStep'
 import {
   clearDraft,
   emptyDraft,
+  hasSavedDraft,
   loadDraft,
   saveDraft,
   type ListingDraft,
@@ -41,6 +43,9 @@ import {
 /** 사진을 받는 두 단계. 만료된 사진이 있으면 여기로 되돌린다. */
 const BUILDING_STEP = 2
 const ROOM_STEP = 5
+
+/** 이 탭에서 등록 화면을 쓰는 중이라는 표시. 새로고침과 「다시 들어옴」을 가른다. */
+const WRITING_FLAG = 'kohere.listingNewWriting'
 
 /** 저장해 둔 사진을 화면 상태로 되돌린다. File 이 없어 다시 보내기는 안 된다. */
 const restorePhoto = (photo: StoredPhoto): Photo => ({ ...photo })
@@ -75,6 +80,21 @@ const toStoredMap = (map: Record<string, Photo[]>): Record<string, StoredPhoto[]
 
 export default function ListingNewPage() {
   const [draft, setDraft] = useState<ListingDraft>(loadDraft)
+
+  /*
+   * 임시 저장이 있으면 이어서 할지 먼저 묻는다 (시안 팝업).
+   *
+   * 단, 작성 중 새로고침에는 묻지 않는다 — 방금까지 쓰던 사람에게 물으면 이상하다.
+   * 「이 탭에서 작성 중이었다」는 표시를 sessionStorage 에 남겨 구분한다. 같은 탭의
+   * 새로고침에는 남아 있고, 다른 화면으로 떠나면 지우며, 탭을 닫으면 브라우저가 지운다.
+   */
+  const [resumeAsk, setResumeAsk] = useState(
+    () => hasSavedDraft() && sessionStorage.getItem(WRITING_FLAG) === null,
+  )
+  useEffect(() => {
+    sessionStorage.setItem(WRITING_FLAG, '1')
+    return () => sessionStorage.removeItem(WRITING_FLAG)
+  }, [])
   /*
    * 사진은 올리고 나면 key · url 만 남아 임시 저장에 담긴다. 화면 상태에는 올리는 중인
    * 사진과 실패한 사진도 함께 두는데, 그것들은 저장 대상이 아니다.
@@ -516,6 +536,15 @@ export default function ListingNewPage() {
         />
       )}
       {draft.step === 9 && <SubmittedStep receiptNo={receiptNo} onRestart={restart} />}
+
+      <ResumeDraftDialog
+        open={resumeAsk}
+        onResume={() => setResumeAsk(false)}
+        onRestart={() => {
+          restart()
+          setResumeAsk(false)
+        }}
+      />
     </div>
   )
 }

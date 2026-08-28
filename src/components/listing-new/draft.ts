@@ -177,6 +177,15 @@ export function emptyDraft(): ListingDraft {
   }
 }
 
+/** 저장본이 있는지만 본다. 등록 화면이 「이어서 하시겠습니까」 팝업을 띄울지 정할 때 쓴다. */
+export function hasSavedDraft(): boolean {
+  try {
+    return localStorage.getItem(DRAFT_KEY) !== null
+  } catch {
+    return false
+  }
+}
+
 export function loadDraft(): ListingDraft {
   const empty = emptyDraft()
 

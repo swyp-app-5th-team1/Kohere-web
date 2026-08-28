@@ -48,11 +48,17 @@ function draftSubtitle(step: number): string {
 /*
  * 카드 치수는 디자이너 확인값(2026-08-28)이다.
  * 안쪽 여백 좌우 16 · 상하 12(썸네일이 경계에서 12), 요소 사이 16.
+ * 테두리는 안쪽 선(inside stroke)이라 상하 여백을 11 로 두면 전체 높이가 시안값 96 이 된다.
  * hover 는 시안 둘째 카드처럼 배경만 남고 테두리가 사라진다.
  */
-const cardClass =
-  'border-line-normal flex w-full items-center gap-4 rounded-2xl border bg-white px-4 py-3 ' +
+const cardBase =
+  'flex w-full items-center gap-4 rounded-2xl border bg-white px-4 py-[11px] ' +
   'transition-colors hover:border-transparent hover:bg-cool-neutral-5'
+
+const cardClass = cardBase + ' border-line-normal'
+
+/** 작성 중 카드만 테두리가 없다. 투명 테두리로 높이는 다른 카드와 같게 유지한다. */
+const draftCardClass = cardBase + ' border-transparent'
 
 function CardThumbnail({ url }: { url: string | null }) {
   return (
@@ -159,20 +165,20 @@ export default function ListingsPage() {
         </main>
       )}
 
-      {/* 시안의 빈 상태 — 등록한 매물도 작성 중인 것도 없을 때만. */}
+      {/* 시안의 빈 상태 — 등록한 매물도 작성 중인 것도 없을 때만. 치수는 디자이너 확인값(2026-08-29). */}
       {error === null && empty && (
         <main className="flex w-full flex-1 flex-col items-center justify-center gap-10 px-6">
-          <div className="flex flex-col items-center gap-4">
+          <div className="flex flex-col items-center gap-12">
             <h1 className="text-[32px] leading-10 font-bold text-[#242424]">
               첫 매물을 등록해 보세요
             </h1>
-            <p className="text-cool-neutral-30 text-base leading-6">
+            <p className="text-label-alternative text-base leading-6 font-semibold">
               등록하신 매물은 검토 후 Kohere 앱에 노출됩니다.
             </p>
           </div>
           <Link
             to="/listings/new"
-            className="bg-primary-40 flex h-12 w-[380px] max-w-full items-center justify-center rounded-xl text-base leading-6 font-semibold text-white transition hover:brightness-95"
+            className="bg-primary-50 flex h-12 w-[423px] max-w-full items-center justify-center rounded-2xl text-base leading-6 font-semibold text-white transition hover:brightness-95"
           >
             매물 등록 시작하기
           </Link>
@@ -195,7 +201,7 @@ export default function ListingsPage() {
             <div className="flex w-full flex-col gap-[25px]">
               {/* 작성 중인 매물. 누르면 등록 화면이 임시 저장을 이어서 연다. */}
               {draft !== null && (
-                <Link to="/listings/new" className={cardClass}>
+                <Link to="/listings/new" className={draftCardClass}>
                   <CardThumbnail url={draft.photoUrl} />
                   <CardBody
                     title={draft.title}

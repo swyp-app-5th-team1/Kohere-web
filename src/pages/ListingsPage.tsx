@@ -34,8 +34,11 @@ const cardClass =
 
 function CardThumbnail({ url }: { url: string | null }) {
   return (
-    /* 높이 80 은 카드 104 에서 역산한 값. 너비는 아직 눈대중이라 시안 확인이 필요하다. */
-    <span className="bg-cool-neutral-7 block h-[80px] w-[107px] shrink-0 overflow-hidden rounded-xl">
+    /*
+     * 120×80 (시안 확정값). 저장된 사진은 16:9 라 이 3:2 틀에서는 object-cover 가
+     * 중앙 기준으로 좌우를 조금 잘라 보여 준다 — 원본이 바뀌는 건 아니다.
+     */
+    <span className="bg-cool-neutral-7 block h-[80px] w-[120px] shrink-0 overflow-hidden rounded-xl">
       {/* 만료됐거나 없는 사진은 회색 바탕만 남긴다. */}
       {url && (
         <img

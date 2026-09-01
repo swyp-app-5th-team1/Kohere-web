@@ -1,5 +1,11 @@
+import { useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
-import type { ListingDetail, MyListingEntry } from '../api/listings'
+import {
+  fetchEditableListing,
+  myListingDetailErrorMessage,
+  type ListingDetail,
+  type MyListingEntry,
+} from '../api/listings'
 import { AppHeader } from '../components/AppHeader'
 import { formatPhone } from '../components/form/formatters'
 import { BUILDING_TYPES } from '../components/listing-new/buildingTypes'
@@ -123,33 +129,95 @@ export default function ListingDetailPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const navigationState = location.state as ListingDetailNavigationState | null
-  const entry = navigationState?.entry
+  const navigationEntry = navigationState?.entry
+  const matchingNavigationEntry =
+    navigationEntry && listingId && navigationEntry.listing.listingId === listingId
+      ? navigationEntry
+      : null
+  const [entry, setEntry] = useState<MyListingEntry | null>(matchingNavigationEntry)
+  const [loading, setLoading] = useState(matchingNavigationEntry === null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [reloadKey, setReloadKey] = useState(0)
   const detail = entry && entry.listing.listingId === listingId ? entry.listing : null
   const close = () => navigate('/listings')
   const editable = detail?.status === 'PUBLISHED' || detail?.status === 'REJECTED'
   const rejected = detail?.status === 'REJECTED'
   const rejectionReason = entry?.rejectionReason ?? '-'
 
+  /*
+   * 목록에서 이동하면 navigation state를 즉시 사용하고, 새로고침·직접 URL 진입이면
+   * 수정 전용 상세 API로 다시 채운다. 라우터 state만 믿으면 새로고침 순간 화면이 사라진다.
+   */
+  useEffect(() => {
+    if (matchingNavigationEntry !== null) {
+      setEntry(matchingNavigationEntry)
+      setLoading(false)
+      setLoadError(null)
+      return
+    }
+
+    if (!listingId) {
+      setEntry(null)
+      setLoading(false)
+      setLoadError('매물을 찾을 수 없습니다.')
+      return
+    }
+
+    const controller = new AbortController()
+    setEntry(null)
+    setLoading(true)
+    setLoadError(null)
+
+    fetchEditableListing(listingId, controller.signal)
+      .then((result) => {
+        setEntry({
+          listing: result.listing,
+          rejectionReason: result.rejectionReason,
+        })
+      })
+      .catch((cause: unknown) => {
+        if (!controller.signal.aborted) setLoadError(myListingDetailErrorMessage(cause))
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false)
+      })
+
+    return () => controller.abort()
+  }, [listingId, matchingNavigationEntry, reloadKey])
+
   return (
     <div className="flex min-h-dvh flex-col bg-white">
       <AppHeader />
 
-      {detail === null && (
-        <main className="flex w-full flex-1 flex-col items-center justify-center gap-6 px-6">
-          <p className="text-cool-neutral-30 text-base leading-6">
-            목록에서 확인할 매물을 다시 선택해 주세요.
-          </p>
-          <button
-            type="button"
-            onClick={close}
-            className="bg-label-normal border-line-normal h-12 rounded-2xl border px-6 text-base leading-6 font-semibold text-white transition hover:opacity-90"
-          >
-            목록으로
-          </button>
+      {loading && (
+        <main className="text-cool-neutral-30 flex w-full flex-1 items-center justify-center px-6 text-base leading-6">
+          매물 정보를 불러오는 중입니다.
         </main>
       )}
 
-      {detail !== null && (
+      {!loading && loadError !== null && (
+        <main className="flex w-full flex-1 flex-col items-center justify-center gap-6 px-6">
+          <p className="text-cool-neutral-30 text-base leading-6">{loadError}</p>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={close}
+              className="border-line-normal text-label-normal h-12 rounded-2xl border px-6 text-base leading-6 font-semibold"
+            >
+              목록으로
+            </button>
+            <button
+              type="button"
+              onClick={() => setReloadKey((key) => key + 1)}
+              className="bg-label-normal border-line-normal h-12 rounded-2xl border px-6 text-base leading-6 font-semibold text-white transition hover:opacity-90"
+            >
+              다시 시도
+            </button>
+          </div>
+        </main>
+      )}
+
+      {!loading && loadError === null && detail !== null && (
         <main className="flex w-full flex-1 flex-col items-center px-6 pt-[52px] pb-[51px] md:px-12">
           <div className="flex w-full max-w-[980px] flex-col">
             <h1 className="text-[32px] leading-10 font-bold text-[#242424]">{detail.title}</h1>

@@ -283,6 +283,23 @@ export function editableListingErrorMessage(error: unknown): string {
   }
 }
 
+/** 내 매물 상세 조회 실패 문구. 수정 가능 여부와 무관한 상세 화면에서 사용한다. */
+export function myListingDetailErrorMessage(error: unknown): string {
+  if (!(error instanceof ApiError)) {
+    return '매물 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'
+  }
+
+  switch (error.code) {
+    case 'LISTING_NOT_FOUND':
+      return '매물을 찾을 수 없습니다.'
+    case 'FORBIDDEN':
+    case 'AUTH_ONBOARDING_REQUIRED':
+      return '이 매물을 확인할 권한이 없습니다.'
+    default:
+      return '매물 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'
+  }
+}
+
 export function updateListingErrorMessage(error: unknown): string {
   if (!(error instanceof ApiError)) {
     return '수정 요청 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.'

@@ -1,10 +1,14 @@
 import { Chip, ChipGroup } from '../form/Chip'
-import { Field, inputClass } from '../form/Field'
+import { Field, FieldError } from '../form/Field'
+import { useTouched } from '../form/useTouched'
 import { PhotoPicker, type Photo } from '../form/PhotoPicker'
+import { TextField } from '../form/TextField'
 import { StepFooter } from './StepFooter'
+import { StepTitle } from './StepTitle'
+import { StepBody } from './StepBody'
+import { BUILDING_TYPES } from './buildingTypes'
+import { floorCountError, floorSpanError, parseCount } from './ranges'
 import type { BuildingDraft } from './draft'
-
-const BUILDING_TYPES = ['상가건물', '단독건물', '빌라/연립', '주상복합', '단독주택', '오피스텔']
 
 type BuildingInfoStepProps = {
   value: BuildingDraft
@@ -14,6 +18,8 @@ type BuildingInfoStepProps = {
   onAddPhotos: (files: File[]) => void
   onRemovePhoto: (index: number) => void
   onMakePhotoPrimary: (index: number) => void
+  onMovePhoto: (from: number, to: number) => void
+  photoFailures: { name: string; reason: string }[]
   onPrev: () => void
   onNext: () => void
 }
@@ -26,10 +32,24 @@ export function BuildingInfoStep({
   onAddPhotos,
   onRemovePhoto,
   onMakePhotoPrimary,
+  onMovePhoto,
+  photoFailures,
   onPrev,
   onNext,
 }: BuildingInfoStepProps) {
+  const touched = useTouched()
+
+  /* 서버가 400 을 내는 조건을 미리 본다 — ranges.ts 의 형식 규칙을 그대로 쓴다. */
+  const totalFloorsError = floorCountError(value.totalFloors)
+  const floorRangeError = floorSpanError(value.operatingFloors, parseCount(value.totalFloors))
+
+  /* 다음 버튼은 위 값으로 잠그고, 빨간 문구는 한 번 다녀간 칸에만 그린다. */
+  const shownTotalFloorsError = touched.error('totalFloors', totalFloorsError)
+  const shownFloorRangeError = touched.error('operatingFloors', floorRangeError)
+
   const filled =
+    totalFloorsError === null &&
+    floorRangeError === null &&
     value.buildingType !== '' &&
     value.totalFloors.trim() !== '' &&
     value.operatingFloors.trim() !== '' &&
@@ -39,44 +59,62 @@ export function BuildingInfoStep({
 
   return (
     <>
-      <main className="flex w-full flex-1 flex-col items-center px-6 py-14">
+      <StepBody>
         <div className="flex w-full max-w-[980px] flex-col gap-8">
-          <h1 className="text-[32px] leading-6 font-bold text-[#242424]">건물 정보를 입력해주세요.</h1>
+          <StepTitle>건물 정보를 입력해주세요.</StepTitle>
 
           <div className="flex w-full flex-col gap-8">
             <Field label="건물 형태">
               <ChipGroup>
+                {/* 화면에는 라벨을 보이고 담는 건 서버 코드다. buildingTypes.ts 참고. */}
                 {BUILDING_TYPES.map((type) => (
                   <Chip
-                    key={type}
-                    selected={value.buildingType === type}
-                    onClick={() => onChange({ buildingType: type })}
+                    key={type.code}
+                    selected={value.buildingType === type.code}
+                    onClick={() => onChange({ buildingType: type.code })}
                   >
-                    {type}
+                    {type.label}
                   </Chip>
                 ))}
               </ChipGroup>
             </Field>
 
             <div className="flex w-full gap-[50px]">
+              {/*
+                시안 예시대로 「8층」이라 적어도 되고, 보낼 때만 「층」을 뗀다. 다만 숫자만
+                훑어 내지는 않는다 — 그러면 「지하1~4층」이 「1~4」가 되고 「8, 9층」이 89층이
+                되어, 화면에 보이는 것과 보내는 값이 달라진다(ranges.ts 참고).
+              */}
               <div className="min-w-0 flex-1">
                 <Field label="총 층수">
-                  <input
-                    value={value.totalFloors}
-                    onChange={(event) => onChange({ totalFloors: event.target.value })}
-                    placeholder="예: 8층"
-                    className={inputClass + ' font-medium'}
-                  />
+                  <div className="flex w-full flex-col gap-1">
+                    <TextField
+                      value={value.totalFloors}
+                      inputMode="numeric"
+                      error={shownTotalFloorsError !== null}
+                      onChange={(event) => onChange({ totalFloors: event.target.value })}
+                      onBlur={() => touched.touch('totalFloors')}
+                      placeholder="예: 8층"
+                      className="font-medium"
+                    />
+                    {shownTotalFloorsError && <FieldError>{shownTotalFloorsError}</FieldError>}
+                  </div>
                 </Field>
               </div>
               <div className="min-w-0 flex-1">
                 <Field label="지점 운영층">
-                  <input
-                    value={value.operatingFloors}
-                    onChange={(event) => onChange({ operatingFloors: event.target.value })}
-                    placeholder="예: 2~4층"
-                    className={inputClass + ' font-medium'}
-                  />
+                  <div className="flex w-full flex-col gap-1">
+                    <TextField
+                      value={value.operatingFloors}
+                      inputMode="numeric"
+                      error={shownFloorRangeError !== null}
+                      onChange={(event) => onChange({ operatingFloors: event.target.value })}
+                      onBlur={() => touched.touch('operatingFloors')}
+                      placeholder="예: 2층 또는 2~4층"
+                      className="font-medium"
+                    />
+                    {shownFloorRangeError && <FieldError>{shownFloorRangeError}</FieldError>}
+                  </div>
                 </Field>
               </div>
             </div>
@@ -125,11 +163,13 @@ export function BuildingInfoStep({
                 onAdd={onAddPhotos}
                 onRemove={onRemovePhoto}
                 onMakePrimary={onMakePhotoPrimary}
+                onMove={onMovePhoto}
+                failures={photoFailures}
               />
             </Field>
           </div>
         </div>
-      </main>
+      </StepBody>
 
       <StepFooter step={2} onPrev={onPrev} onNext={onNext} nextDisabled={!filled} />
     </>

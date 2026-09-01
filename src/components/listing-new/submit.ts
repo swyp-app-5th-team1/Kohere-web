@@ -24,7 +24,7 @@ export type ListingRequest = {
   type: string
   contact: { managerName: string; phone: string }
   businessRegistrationNumber: string
-  address: { fullAddress: string; detail: string; lat: number; lng: number }
+  address: { fullAddress: string; detail: string | null; lat: number; lng: number }
   building: {
     type: string
     totalFloors: number
@@ -88,6 +88,7 @@ function facilitiesOf(amenities: string[]) {
 function roomOfferOf(
   room: ListingDraft['roomTypes'][number],
   roomPhotos: Record<string, Photo[]>,
+  minimumPhotos = 2,
 ) {
   const monthlyRent = parseMoney(room.monthlyRent)
   const deposit = parseMoney(room.deposit)
@@ -99,7 +100,7 @@ function roomOfferOf(
   if (monthlyRent === null || deposit === null || maintenanceFee === null) return null
   if (minStayMonths === null || maxStayMonths === null) return null
   if (room.name.trim() === '' || room.options.length === 0) return null
-  if (roomImageKeys.length < 2) return null
+  if (roomImageKeys.length < minimumPhotos) return null
 
   return {
     name: room.name.trim(),
@@ -108,6 +109,14 @@ function roomOfferOf(
     filterTags: room.options,
     roomImageKeys,
   }
+}
+
+export type ListingUpdateRequest = Omit<ListingRequest, 'consents' | 'roomOffers'> & {
+  blogUrl?: string
+  roomOffers: (ListingRequest['roomOffers'][number] & {
+    roomOfferId: string | null
+    status: 'ACTIVE' | 'INACTIVE'
+  })[]
 }
 
 /**
@@ -183,5 +192,53 @@ export function buildListingRequest(
       privacyPolicyAgreed: true,
       listingExposureAgreed: true,
     },
+  }
+}
+
+/**
+ * 수정은 부분 저장이 아니라 전체 교체다. 화면에 보이는 ACTIVE 방 뒤에 기존 INACTIVE 방을
+ * 함께 보내며, 기존 사진은 listings/… key, 새 사진은 uploads/… key인 채 한 배열에 섞인다.
+ */
+export function buildListingUpdateRequest(
+  draft: ListingDraft,
+  branchPhotos: Photo[],
+  roomPhotos: Record<string, Photo[]>,
+  inactiveRooms: ListingDraft['roomTypes'],
+): ListingUpdateRequest | null {
+  const createdShape = buildListingRequest(draft, branchPhotos, roomPhotos)
+  if (createdShape === null) return null
+
+  const activeRooms = createdShape.roomOffers.map((offer, index) => ({
+    ...offer,
+    roomOfferId: draft.roomTypes[index]?.roomOfferId ?? null,
+    status: 'ACTIVE' as const,
+  }))
+
+  const inactiveOffers = inactiveRooms.map((room) => {
+    const offer = roomOfferOf(room, roomPhotos, 0)
+    if (offer === null || room.roomOfferId === null) return null
+    return {
+      ...offer,
+      roomOfferId: room.roomOfferId,
+      status: 'INACTIVE' as const,
+    }
+  })
+  if (inactiveOffers.some((offer) => offer === null)) return null
+
+  // PUT 스키마에는 신규 등록 때의 동의 필드가 없다. 기존 블로그 주소는 보이지 않는 값이라 보존한다.
+  const { consents: _consents, roomOffers: _roomOffers, ...base } = createdShape
+  const blogUrl = draft.blogUrl?.trim()
+
+  return {
+    ...base,
+    ...(blogUrl ? { blogUrl } : {}),
+    address: {
+      ...base.address,
+      detail: base.address.detail?.trim() || null,
+    },
+    roomOffers: [
+      ...activeRooms,
+      ...(inactiveOffers as NonNullable<(typeof inactiveOffers)[number]>[]),
+    ],
   }
 }

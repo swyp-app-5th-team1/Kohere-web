@@ -11,6 +11,7 @@ import LoginPage from './pages/LoginPage'
 import NotFoundPage from './pages/NotFoundPage'
 import OnboardingPage from './pages/OnboardingPage'
 import ProfilePage from './pages/ProfilePage'
+import ProfileEditPage from './pages/ProfileEditPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import SignupPage from './pages/SignupPage'
 
@@ -38,8 +39,10 @@ export default function App() {
         <Route path="/onboarding" element={<OnboardingPage />} />
         <Route path="/listings" element={<ListingsPage />} />
         <Route path="/listings/new" element={<ListingNewPage />} />
+        <Route path="/listings/:listingId/edit" element={<ListingNewPage />} />
         <Route path="/listings/:listingId" element={<ListingDetailPage />} />
         <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/profile/edit" element={<ProfileEditPage />} />
         {/* 관리자 권한 확인은 서버 응답으로 판단해 추가한다. 지금은 경로만 잡아둔다. */}
         <Route path="/admin" element={<AdminPage />} />
       </Route>

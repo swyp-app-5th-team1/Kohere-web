@@ -110,7 +110,7 @@ export function BuildingInfoStep({
                       error={shownFloorRangeError !== null}
                       onChange={(event) => onChange({ operatingFloors: event.target.value })}
                       onBlur={() => touched.touch('operatingFloors')}
-                      placeholder="예: 2~4층"
+                      placeholder="예: 2층 또는 2~4층"
                       className="font-medium"
                     />
                     {shownFloorRangeError && <FieldError>{shownFloorRangeError}</FieldError>}

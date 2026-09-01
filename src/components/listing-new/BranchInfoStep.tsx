@@ -30,6 +30,8 @@ type BranchInfoStepProps = {
   onChange: (patch: Partial<BranchDraft>) => void
   onPrev: () => void
   onNext: () => void
+  /** 신규 등록은 상세주소 필수지만, 기존 매물에는 서버상 null인 주소가 있을 수 있다. */
+  detailRequired?: boolean
 }
 
 /**
@@ -42,7 +44,13 @@ type BranchInfoStepProps = {
  * 좌표를 주지 않아서다. 사용자는 이미 한 번 골랐으니 후보가 하나면 그대로 쓰고, 여러 건일
  * 때만 다시 묻는다.
  */
-export function BranchInfoStep({ value, onChange, onPrev, onNext }: BranchInfoStepProps) {
+export function BranchInfoStep({
+  value,
+  onChange,
+  onPrev,
+  onNext,
+  detailRequired = true,
+}: BranchInfoStepProps) {
   const [postcodeFailed, setPostcodeFailed] = useState(false)
   const [addressError, setAddressError] = useState<string | null>(null)
   const [resolving, setResolving] = useState(false)
@@ -153,7 +161,7 @@ export function BranchInfoStep({ value, onChange, onPrev, onNext }: BranchInfoSt
     value.address.trim() !== '' &&
     value.lat !== null &&
     value.lng !== null &&
-    value.addressDetail.trim() !== '' &&
+    (!detailRequired || value.addressDetail.trim() !== '') &&
     value.nearestTransit !== null &&
     value.description.trim() !== ''
 

@@ -59,6 +59,8 @@ function readRoom(room: RoomTypeDraft) {
 type RoomTypesStepProps = {
   value: RoomTypeDraft[]
   onChange: (next: RoomTypeDraft[]) => void
+  /** 수정 모드에서 기존 방을 배열에서 버리지 않고 INACTIVE 요청으로 보존한다. */
+  onRemoveRoom?: (room: RoomTypeDraft) => void
   /** 펼쳐진 방 타입의 id. 하나만 펼친다. */
   expandedId: string | null
   onExpandedChange: (id: string | null) => void
@@ -76,6 +78,7 @@ type RoomTypesStepProps = {
 export function RoomTypesStep({
   value,
   onChange,
+  onRemoveRoom,
   expandedId,
   onExpandedChange,
   photos,
@@ -101,6 +104,8 @@ export function RoomTypesStep({
   }
 
   const removeRoom = (id: string) => {
+    const room = value.find((item) => item.id === id)
+    if (room) onRemoveRoom?.(room)
     onChange(value.filter((room) => room.id !== id))
     if (expandedId === id) onExpandedChange(null)
   }

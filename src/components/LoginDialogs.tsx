@@ -39,8 +39,8 @@ export function LoginFailedDialog({
   return (
     <Modal open={open} onClose={onClose} label={title}>
       <ModalHeading title={title}>
-        <p>{maxCount ?? MAX_LOGIN_ATTEMPTS}회 실패시 계정이 잠금 상태로</p>
-        <p>설정되고 이메일을 통해 비밀번호를 재설정 해야합니다.</p>
+        <p>{maxCount ?? MAX_LOGIN_ATTEMPTS}회 실패시 계정이 잠금 상태로 설정되고</p>
+        <p>이메일을 통해 비밀번호를 재설정 해야합니다.</p>
       </ModalHeading>
 
       <button type="button" onClick={onClose} className={`${ctaPrimaryClass} w-full`}>

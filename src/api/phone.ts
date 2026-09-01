@@ -9,6 +9,10 @@ import { ApiError, api } from './client'
 const SEND_CODE_PATH = '/api/v1/auth/phone/signup/verification-code'
 const VERIFY_PATH = '/api/v1/auth/phone/signup/verify'
 
+/** 로그인한 회원의 온보딩·프로필 연락처 변경에 쓰는 인증 경로. */
+const PROFILE_SEND_CODE_PATH = '/api/v1/auth/phone/verification-code'
+const PROFILE_VERIFY_PATH = '/api/v1/auth/phone/verify'
+
 /*
  * 이메일 찾기용 휴대폰 인증. 정책(6자리 · 5분 만료 · 확인 5회 · 재발송 60초)은 가입용과
  * 똑같지만 **챌린지와 마커의 키스페이스가 다르다.** 가입용 마커로 이메일 찾기를 부르면
@@ -60,6 +64,19 @@ export function sendSignupPhoneCode(phone: string): Promise<SendCodeResult> {
  */
 export function verifySignupPhoneCode(phone: string, code: string): Promise<VerifyPhoneResult> {
   return api.post<VerifyPhoneResult>(VERIFY_PATH, {
+    phoneNumber: digitsOnly(phone),
+    code,
+  })
+}
+
+/** 프로필에서 바꿀 새 연락처로 인증번호를 보낸다. 로그인 토큰이 반드시 붙어야 한다. */
+export function sendProfilePhoneCode(phone: string): Promise<SendCodeResult> {
+  return api.post<SendCodeResult>(PROFILE_SEND_CODE_PATH, { phoneNumber: digitsOnly(phone) })
+}
+
+/** 새 연락처를 확인해 `PATCH /users/me`가 사용할 30분짜리 인증 상태를 만든다. */
+export function verifyProfilePhoneCode(phone: string, code: string): Promise<VerifyPhoneResult> {
+  return api.post<VerifyPhoneResult>(PROFILE_VERIFY_PATH, {
     phoneNumber: digitsOnly(phone),
     code,
   })
@@ -136,6 +153,9 @@ export function verifyPhoneErrorMessage(error: unknown): string {
      */
     case 'AUTH_PHONE_VERIFICATION_FAILED':
       return '인증번호가 올바르지 않거나 만료되었습니다. 인증번호를 다시 받아 주세요.'
+
+    case 'TOO_MANY_REQUESTS':
+      return '인증번호 입력 횟수를 초과했습니다. 인증번호를 다시 받아 주세요.'
 
     default:
       return '인증 확인 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.'

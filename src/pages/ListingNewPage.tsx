@@ -1,15 +1,29 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { AppHeader } from '../components/AppHeader'
 import { ResumeDraftDialog } from '../components/listing-new/ResumeDraftDialog'
+import { ListingUpdateConfirmDialog } from '../components/listing-new/ListingUpdateConfirmDialog'
 import { PHOTO_MAX, type Photo } from '../components/form/PhotoPicker'
 import {
   imageRejectReason,
   uploadErrorMessage,
   uploadListingImage,
 } from '../api/listingImages'
-import { createErrorMessage, createListing } from '../api/listings'
+import {
+  createErrorMessage,
+  createListing,
+  editableListingErrorMessage,
+  fetchEditableListing,
+  updateListing,
+  updateListingErrorMessage,
+  type MyListingStatus,
+} from '../api/listings'
 import { downscaleImage } from '../lib/downscaleImage'
-import { buildListingRequest } from '../components/listing-new/submit'
+import {
+  buildListingRequest,
+  buildListingUpdateRequest,
+} from '../components/listing-new/submit'
+import { editableListingToForm } from '../components/listing-new/edit'
 import { AmenitiesStep } from '../components/listing-new/AmenitiesStep'
 import { BranchInfoStep } from '../components/listing-new/BranchInfoStep'
 import { BuildingInfoStep } from '../components/listing-new/BuildingInfoStep'
@@ -79,7 +93,9 @@ const toStoredMap = (map: Record<string, Photo[]>): Record<string, StoredPhoto[]
   )
 
 export default function ListingNewPage() {
-  const [draft, setDraft] = useState<ListingDraft>(loadDraft)
+  const { listingId } = useParams()
+  const navigate = useNavigate()
+  const editing = listingId !== undefined
 
   /*
    * 임시 저장이 있으면 이어서 할지 먼저 묻는다 (시안 팝업).
@@ -89,12 +105,17 @@ export default function ListingNewPage() {
    * 새로고침에는 남아 있고, 다른 화면으로 떠나면 지우며, 탭을 닫으면 브라우저가 지운다.
    */
   const [resumeAsk, setResumeAsk] = useState(
-    () => hasSavedDraft() && sessionStorage.getItem(WRITING_FLAG) === null,
+    () => !editing && hasSavedDraft() && sessionStorage.getItem(WRITING_FLAG) === null,
+  )
+  /* 선택하기 전에는 저장본을 화면에 올리지 않는다. 팝업 뒤에는 새 등록 첫 화면이 보여야 한다. */
+  const [draft, setDraft] = useState<ListingDraft>(() =>
+    editing || resumeAsk ? emptyDraft() : loadDraft(),
   )
   useEffect(() => {
+    if (editing) return
     sessionStorage.setItem(WRITING_FLAG, '1')
     return () => sessionStorage.removeItem(WRITING_FLAG)
-  }, [])
+  }, [editing])
   /*
    * 사진은 올리고 나면 key · url 만 남아 임시 저장에 담긴다. 화면 상태에는 올리는 중인
    * 사진과 실패한 사진도 함께 두는데, 그것들은 저장 대상이 아니다.
@@ -105,7 +126,56 @@ export default function ListingNewPage() {
       Object.entries(draft.roomPhotos).map(([roomId, list]) => [roomId, list.map(restorePhoto)]),
     ),
   )
+  /** 저장본을 실제로 화면에 올린 횟수. 그때마다 저장된 사진의 만료 여부를 한 번 확인한다. */
+  const [restoreGeneration, setRestoreGeneration] = useState(() =>
+    editing || resumeAsk ? 0 : 1,
+  )
   const [expandedRoomId, setExpandedRoomId] = useState<string | null>(null)
+  const [inactiveRooms, setInactiveRooms] = useState<ListingDraft['roomTypes']>([])
+  const [originalStatus, setOriginalStatus] = useState<MyListingStatus | null>(null)
+  const [editLoading, setEditLoading] = useState(editing)
+  const [editLoadError, setEditLoadError] = useState<string | null>(null)
+  const [editReload, setEditReload] = useState(0)
+  const [updateConfirm, setUpdateConfirm] = useState(false)
+
+  /** 수정 모드는 브라우저 초안이 아니라 서버의 전용 상세 한 건으로만 시작한다. */
+  useEffect(() => {
+    if (!editing || listingId === undefined) return
+
+    const controller = new AbortController()
+    setEditLoading(true)
+    setEditLoadError(null)
+
+    fetchEditableListing(listingId, controller.signal)
+      .then((detail) => {
+        if (detail.status !== 'PUBLISHED' && detail.status !== 'REJECTED') {
+          setEditLoadError('현재 심사 중인 매물은 수정할 수 없습니다.')
+          return
+        }
+
+        const form = editableListingToForm(detail)
+        setDraft(form.draft)
+        setPhotos(form.branchPhotos.map(restorePhoto))
+        setRoomPhotos(
+          Object.fromEntries(
+            Object.entries(form.roomPhotos).map(([roomId, list]) => [
+              roomId,
+              list.map(restorePhoto),
+            ]),
+          ),
+        )
+        setInactiveRooms(form.inactiveRooms)
+        setOriginalStatus(detail.status)
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) setEditLoadError(editableListingErrorMessage(error))
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setEditLoading(false)
+      })
+
+    return () => controller.abort()
+  }, [editReload, editing, listingId])
 
   /*
    * 되살린 사진이 아직 서버에 있는지 확인하고, 사라진 것은 목록에서 뺀다.
@@ -114,6 +184,8 @@ export default function ListingNewPage() {
    * 비어 「1장 이상」 조건에 걸리므로, 사용자는 제출 단계가 아니라 지금 다시 올리게 된다.
    */
   useEffect(() => {
+    if (editing || restoreGeneration === 0) return
+
     let cancelled = false
 
     const prune = async (list: Photo[]) => {
@@ -163,20 +235,21 @@ export default function ListingNewPage() {
     return () => {
       cancelled = true
     }
-    // 처음 되살렸을 때만 본다. 그 뒤에 올린 사진은 방금 서버가 준 주소라 확인할 게 없다.
+    // 저장본을 실제로 되살린 때만 본다. 그 뒤에 올린 사진은 방금 서버가 준 주소라 확인할 게 없다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [editing, restoreGeneration])
 
   /*
    * 사진은 다음 버튼을 기다리지 않고 바로 저장한다. 다른 값은 다시 치면 그만이지만
    * 사진은 참조를 잃으면 파일을 다시 골라 올려야 해서 손해가 훨씬 크다.
    */
   useEffect(() => {
+    if (editing) return
     const stored = { branchPhotos: toStored(photos), roomPhotos: toStoredMap(roomPhotos) }
     // 아직 아무것도 저장된 적 없고 사진도 없으면 굳이 빈 초안을 만들지 않는다.
     if (stored.branchPhotos.length === 0 && Object.keys(stored.roomPhotos).length === 0) return
     saveDraft({ ...loadDraft(), ...stored })
-  }, [photos, roomPhotos])
+  }, [editing, photos, roomPhotos])
 
   /** 올라가는 중인 업로드. 사진을 지우거나 화면을 떠날 때 끊는다. */
   const uploads = useRef(new Map<string, AbortController>())
@@ -194,6 +267,7 @@ export default function ListingNewPage() {
 
   /** 등록 중에는 제출 버튼을 잠근다. 두 번 누르면 매물이 두 개 생긴다. */
   const [submitting, setSubmitting] = useState(false)
+  const submitInFlight = useRef(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   /** 서버가 발급한 매물 id. 완료 화면이 접수 번호 자리에 보여 준다. */
   const [receiptNo, setReceiptNo] = useState<string | null>(null)
@@ -378,40 +452,66 @@ export default function ListingNewPage() {
   const goNext = () => {
     setDraft((current) => {
       const next = { ...current, step: current.step + 1 }
-      saveDraft(withPhotos(next))
+      if (!editing) saveDraft(withPhotos(next))
       return next
     })
   }
 
-  /**
-   * 매물을 등록한다.
-   *
-   * 임시 저장본은 **성공한 뒤에만** 비운다. 먼저 비우면 실패했을 때 적은 게 전부 사라진다.
-   * 사진도 마찬가지라 photos 상태를 건드리지 않는다 — 다시 눌러 보면 그대로 올라간다.
-   */
-  const submit = async () => {
-    if (submitting) return
+  /** 신규 등록은 POST, 수정은 모든 단계의 값을 모아 마지막에 PUT 한 번만 보낸다. */
+  const submit = async (): Promise<boolean> => {
+    if (submitInFlight.current) return false
 
-    const payload = buildListingRequest(draft, photos, roomPhotos)
+    const payload = editing
+      ? buildListingUpdateRequest(draft, photos, roomPhotos, inactiveRooms)
+      : buildListingRequest(draft, photos, roomPhotos)
     if (payload === null) {
-      // 각 단계에서 이미 막고 있어서 여기까지 오는 건 임시 저장을 되살린 경우 정도다.
       setSubmitError('입력하신 내용 중 빠진 것이 있습니다. 이전 단계를 다시 확인해 주세요.')
-      return
+      return false
     }
 
+    submitInFlight.current = true
     setSubmitting(true)
     setSubmitError(null)
 
     try {
+      if (editing && listingId !== undefined) {
+        await updateListing(listingId, payload)
+        navigate('/listings', { replace: true })
+        return true
+      }
+
       const created = await createListing(payload)
       clearDraft()
       setReceiptNo(created.listingId)
       setDraft((current) => ({ ...current, step: 9 }))
+      return true
     } catch (error) {
-      setSubmitError(createErrorMessage(error))
+      setSubmitError(
+        editing ? updateListingErrorMessage(error) : createErrorMessage(error),
+      )
+      return false
     } finally {
+      submitInFlight.current = false
       setSubmitting(false)
     }
+  }
+
+  /** 공개 매물만 재심사 동안 숨겨지므로 확인 팝업을 한 번 더 거친다. */
+  const requestSubmit = () => {
+    if (editing && originalStatus === 'PUBLISHED') {
+      setUpdateConfirm(true)
+      return
+    }
+    void submit()
+  }
+
+  const preserveRemovedRoom = (room: ListingDraft['roomTypes'][number]) => {
+    if (!editing || room.roomOfferId === null) return
+    setInactiveRooms((current) =>
+      current.some((item) => item.roomOfferId === room.roomOfferId)
+        ? current
+        : [...current, { ...room, status: 'INACTIVE' }],
+    )
   }
 
   const restart = () => {
@@ -424,11 +524,65 @@ export default function ListingNewPage() {
     setSubmitError(null)
   }
 
+  const resume = () => {
+    const saved = loadDraft()
+    setDraft(saved)
+    setPhotos(saved.branchPhotos.map(restorePhoto))
+    setRoomPhotos(
+      Object.fromEntries(
+        Object.entries(saved.roomPhotos).map(([roomId, list]) => [
+          roomId,
+          list.map(restorePhoto),
+        ]),
+      ),
+    )
+    setExpandedRoomId(null)
+    setFailures([])
+    setRoomFailures({})
+    setSubmitError(null)
+    setRestoreGeneration((current) => current + 1)
+  }
+
   const patch = <Section extends 'branch' | 'building' | 'conditions' | 'survey' | 'contact'>(
     section: Section,
   ) => {
     return (values: Partial<ListingDraft[Section]>) =>
       setDraft((current) => ({ ...current, [section]: { ...current[section], ...values } }))
+  }
+
+  if (editing && (editLoading || editLoadError !== null)) {
+    return (
+      <div className="flex min-h-dvh flex-col bg-white">
+        <AppHeader />
+        <main className="flex flex-1 flex-col items-center justify-center gap-6 px-6">
+          {editLoading ? (
+            <p className="text-cool-neutral-30 text-base leading-6">매물 정보를 불러오는 중입니다.</p>
+          ) : (
+            <>
+              <p role="alert" className="text-cool-neutral-30 text-base leading-6">
+                {editLoadError}
+              </p>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => navigate('/listings')}
+                  className="bg-cool-neutral-20 border-line-alternative h-12 rounded-2xl border px-6 text-base leading-6 font-semibold text-white"
+                >
+                  목록으로
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditReload((current) => current + 1)}
+                  className="bg-label-normal border-line-normal h-12 rounded-2xl border px-6 text-base leading-6 font-semibold text-white"
+                >
+                  다시 시도
+                </button>
+              </div>
+            </>
+          )}
+        </main>
+      </div>
+    )
   }
 
   return (
@@ -452,6 +606,7 @@ export default function ListingNewPage() {
           onChange={patch('branch')}
           onPrev={goPrev}
           onNext={goNext}
+          detailRequired={!editing}
         />
       )}
       {draft.step === 2 && (
@@ -488,6 +643,7 @@ export default function ListingNewPage() {
         <RoomTypesStep
           value={draft.roomTypes}
           onChange={(roomTypes) => setDraft((current) => ({ ...current, roomTypes }))}
+          onRemoveRoom={preserveRemovedRoom}
           expandedId={expandedRoomId}
           onExpandedChange={setExpandedRoomId}
           photos={roomPhotos}
@@ -529,8 +685,10 @@ export default function ListingNewPage() {
           draft={draft}
           photos={photos}
           roomPhotos={roomPhotos}
-          onSaveDraft={() => saveDraft(withPhotos(draft))}
-          onSubmit={() => void submit()}
+          onSaveDraft={editing ? undefined : () => saveDraft(withPhotos(draft))}
+          onPrev={goPrev}
+          onSubmit={requestSubmit}
+          editing={editing}
           submitting={submitting}
           submitError={submitError}
         />
@@ -538,11 +696,26 @@ export default function ListingNewPage() {
       {draft.step === 9 && <SubmittedStep receiptNo={receiptNo} onRestart={restart} />}
 
       <ResumeDraftDialog
-        open={resumeAsk}
-        onResume={() => setResumeAsk(false)}
+        open={!editing && resumeAsk}
+        onResume={() => {
+          resume()
+          setResumeAsk(false)
+        }}
         onRestart={() => {
           restart()
           setResumeAsk(false)
+        }}
+      />
+
+      <ListingUpdateConfirmDialog
+        open={updateConfirm}
+        submitting={submitting}
+        onCancel={() => setUpdateConfirm(false)}
+        onConfirm={async () => {
+          const succeeded = await submit()
+          // 성공하면 목록 이동으로 이 화면 자체가 사라진다. 실패할 때만 팝업을 내려
+          // 마지막 확인 화면의 오류 문구가 바로 보이게 한다.
+          if (!succeeded) setUpdateConfirm(false)
         }}
       />
     </div>

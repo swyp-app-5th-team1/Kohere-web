@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   findEmail,
   findEmailErrorMessage,
@@ -50,7 +51,12 @@ const tabClass = (selected: boolean) =>
  * 자체가 방어라, 한쪽으로 통일하지 않는다.
  */
 export default function FindAccountPage() {
-  const [tab, setTab] = useState<Tab>('email')
+  const [searchParams] = useSearchParams()
+  const passwordOnly = searchParams.get('source') === 'profile'
+  const initialTab: Tab =
+    passwordOnly || searchParams.get('tab') === 'password' ? 'password' : 'email'
+
+  const [tab, setTab] = useState<Tab>(initialTab)
 
   // 이메일 찾기 탭.
   const [name, setName] = useState('')
@@ -218,35 +224,40 @@ export default function FindAccountPage() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-white px-6 py-12">
       <div className="flex w-full max-w-[425px] flex-col items-center gap-8">
-        <div role="tablist" className="flex w-full items-center justify-center gap-[59px]">
-          <button
-            type="button"
-            role="tab"
-            id="tab-email"
-            aria-selected={findingEmail}
-            aria-controls="find-account-form"
-            onClick={() => selectTab('email')}
-            className={`${tabClass(findingEmail)} text-right`}
-          >
-            이메일 찾기
-          </button>
-          <button
-            type="button"
-            role="tab"
-            id="tab-password"
-            aria-selected={!findingEmail}
-            aria-controls="find-account-form"
-            onClick={() => selectTab('password')}
-            className={`${tabClass(!findingEmail)} text-left`}
-          >
-            비밀번호 찾기
-          </button>
-        </div>
+        {!passwordOnly && (
+          <div role="tablist" className="flex w-full items-center justify-center gap-[59px]">
+            <button
+              type="button"
+              role="tab"
+              id="tab-email"
+              aria-selected={findingEmail}
+              aria-controls="find-account-form"
+              onClick={() => selectTab('email')}
+              className={`${tabClass(findingEmail)} text-right`}
+            >
+              이메일 찾기
+            </button>
+            <button
+              type="button"
+              role="tab"
+              id="tab-password"
+              aria-selected={!findingEmail}
+              aria-controls="find-account-form"
+              onClick={() => selectTab('password')}
+              className={`${tabClass(!findingEmail)} text-left`}
+            >
+              비밀번호 찾기
+            </button>
+          </div>
+        )}
 
         <form
           id="find-account-form"
-          role="tabpanel"
-          aria-labelledby={findingEmail ? 'tab-email' : 'tab-password'}
+          role={passwordOnly ? undefined : 'tabpanel'}
+          aria-label={passwordOnly ? '비밀번호 변경' : undefined}
+          aria-labelledby={
+            passwordOnly ? undefined : findingEmail ? 'tab-email' : 'tab-password'
+          }
           onSubmit={handleSubmit}
           className="flex w-full flex-col items-center gap-8"
         >
@@ -382,10 +393,11 @@ export default function FindAccountPage() {
            */}
           {linkSent && (
             <p role="status" className="text-cool-neutral-70 w-full text-center text-sm leading-5">
-              입력하신 주소로 비밀번호 재설정 링크를 보냈습니다.
-              {linkValidMinutes !== null && ` 링크는 ${linkValidMinutes}분간 유효합니다.`}
-              <br />
-              메일이 보이지 않으면 스팸함을 확인해 주세요.
+              <span className="block">입력하신 주소로 비밀번호 재설정 링크를 보냈습니다.</span>
+              {linkValidMinutes !== null && (
+                <span className="block">링크는 {linkValidMinutes}분간 유효합니다.</span>
+              )}
+              <span className="block">메일이 보이지 않으면 스팸함을 확인해 주세요.</span>
             </p>
           )}
 

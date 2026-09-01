@@ -29,11 +29,15 @@ export function parseCount(text: string): number | null {
 }
 
 /**
- * 「2~4」 · 「2~4층」 · 「2층~4층」 을 숫자 두 개로. 그 밖이면 null 이다.
+ * 단일 층 「2」·「2층」과 범위 「2~4」·「2~4층」·「2층~4층」을 숫자 두 개로 읽는다.
+ * 서버는 항상 min~max를 받으므로 단일 층은 min과 max를 같은 값으로 만든다.
  *
  * 물결표는 반각(~)과 전각(～) 둘 다 받는다 — 입력기에 따라 전각이 들어오는 일이 있다.
  */
 export function parseSpan(text: string): { min: number; max: number } | null {
+  const single = parseCount(text)
+  if (single !== null) return { min: single, max: single }
+
   const match = /^(\d+)\s*층?\s*[~～]\s*(\d+)\s*층?$/.exec(text.trim())
   return match ? { min: Number(match[1]), max: Number(match[2]) } : null
 }
@@ -78,7 +82,7 @@ export function floorSpanError(text: string, total: number | null): string | nul
   if (text.trim() === '') return null
 
   const span = parseSpan(text)
-  if (span === null) return '1~2 또는 2~4층 처럼 적어 주세요'
+  if (span === null) return '2, 2층 또는 2~4층처럼 적어 주세요'
   if (span.min < 1) return '운영층은 1층부터 적어 주세요'
   if (span.min > span.max) return '끝 층을 시작 층보다 높게 적어 주세요'
   if (total !== null && span.max > total) return '운영층은 총 층수 안에서 적어 주세요'

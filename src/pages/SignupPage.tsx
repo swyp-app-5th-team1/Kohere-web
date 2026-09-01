@@ -33,7 +33,6 @@ import {
   FieldError,
   inputClass,
   inputErrorClass,
-  passwordMaskClass,
 } from '../components/form/Field'
 import { FormattedInput } from '../components/form/FormattedInput'
 import { birthDateToIso, formatBirthDate, formatPhone } from '../components/form/formatters'
@@ -44,8 +43,8 @@ import arrowLeftUrl from '../assets/icon-arrow-left.svg'
 
 const fieldClass = `${inputClass} font-medium`
 const errorFieldClass = `${inputErrorClass} font-medium`
-const passwordFieldClass = `${fieldClass} ${passwordMaskClass}`
-const passwordErrorFieldClass = `${errorFieldClass} ${passwordMaskClass}`
+const passwordFieldClass = fieldClass
+const passwordErrorFieldClass = errorFieldClass
 
 /** 화면 검증에서 나온 칸별 오류. 값이 있으면 그 칸이 빨간 테두리가 되고 아래에 문구가 붙는다. */
 type FieldKey =
@@ -723,17 +722,19 @@ export default function SignupPage() {
                     [
                       termsAgreed,
                       setTermsAgreed,
+                      privacyAgreed,
                       '서비스 이용약관 (필수)',
                       DOCUMENT_URLS.termsOfService,
                     ],
                     [
                       privacyAgreed,
                       setPrivacyAgreed,
+                      termsAgreed,
                       '개인정보처리방침 (필수)',
                       DOCUMENT_URLS.privacyPolicy,
                     ],
                   ] as const
-                ).map(([checked, setChecked, label, url]) => (
+                ).map(([checked, setChecked, otherChecked, label, url]) => (
                   <div
                     key={label}
                     className="border-line-normal flex h-14 w-full items-center justify-between rounded-2xl border bg-white px-4"
@@ -743,8 +744,11 @@ export default function SignupPage() {
                         checked={checked}
                         onChange={(next) => {
                           setChecked(next)
-                          // 체크하면 「필수 약관에 동의해 주세요」가 바로 사라지게 다시 본다.
-                          revalidate('agreement', null)
+                          // 오류는 필수 약관 두 개가 모두 체크된 순간에만 사라진다.
+                          revalidate(
+                            'agreement',
+                            next && otherChecked ? null : '필수 약관에 동의해 주세요.',
+                          )
                         }}
                       />
                       <span className="text-neutral-70 text-base leading-6">{label}</span>

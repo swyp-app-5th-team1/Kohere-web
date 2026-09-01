@@ -67,6 +67,10 @@ export type ConditionsDraft = {
 export type RoomTypeDraft = {
   /** 사진처럼 임시 저장 밖에 두는 값을 방 타입에 이어 붙이기 위한 열쇠. */
   id: string
+  /** 수정 모드에서만 있다. 새 방과 신규 등록 초안은 null이다. */
+  roomOfferId: string | null
+  /** 수정 모드에서 기존 방을 내릴 때 INACTIVE로 전체 교체 요청에 남긴다. */
+  status: 'ACTIVE' | 'INACTIVE'
   name: string
   deposit: string
   maintenanceFee: string
@@ -100,6 +104,8 @@ export type ListingDraft = {
   roomTypes: RoomTypeDraft[]
   survey: SurveyDraft
   contact: ContactDraft
+  /** 등록 화면에는 칸이 없지만, 수정 전체 교체 때 기존 값을 지우지 않기 위해 보존한다. */
+  blogUrl: string | null
   /** 지점 대표사진. 첫 장이 대표라 순서가 그대로 등록 요청에 실린다. */
   branchPhotos: StoredPhoto[]
   /** 방 타입 id 별 객실 사진. */
@@ -124,6 +130,8 @@ export function createRoomType(): RoomTypeDraft {
   return {
     // 순번을 쓰면 새로고침 때 0 부터 다시 세는 바람에 저장돼 있던 방 타입과 id 가 겹친다.
     id: crypto.randomUUID(),
+    roomOfferId: null,
+    status: 'ACTIVE',
     name: '',
     deposit: '',
     maintenanceFee: '',
@@ -172,6 +180,7 @@ export function emptyDraft(): ListingDraft {
       phone: '',
       businessNumber: '',
     },
+    blogUrl: null,
     branchPhotos: [],
     roomPhotos: {},
   }
@@ -195,7 +204,13 @@ export function loadDraft(): ListingDraft {
 
     // 저장해 둔 모양이 바뀌었어도 화면이 깨지지 않도록 빈 값 위에 덮어쓴다.
     const saved = JSON.parse(raw) as Partial<ListingDraft>
-    const roomTypes = saved.roomTypes?.length ? saved.roomTypes : empty.roomTypes
+    const roomTypes = saved.roomTypes?.length
+      ? saved.roomTypes.map((room) => ({
+          ...room,
+          roomOfferId: room.roomOfferId ?? null,
+          status: room.status ?? 'ACTIVE',
+        }))
+      : empty.roomTypes
 
     return {
       step: saved.step ?? 0,
@@ -207,6 +222,7 @@ export function loadDraft(): ListingDraft {
       roomTypes,
       survey: { ...empty.survey, ...saved.survey },
       contact: { ...empty.contact, ...saved.contact },
+      blogUrl: saved.blogUrl ?? null,
       branchPhotos: saved.branchPhotos ?? [],
       roomPhotos: saved.roomPhotos ?? {},
     }

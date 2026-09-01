@@ -77,6 +77,11 @@ export function formatBusinessNumber(raw: string): string {
   return join(digitsOf(raw, 10), [3, 2, 5])
 }
 
+/** 사업자등록번호의 형식만 확인한다. 실제 등록 여부는 매물 심사에서 판단한다. */
+export function isBusinessNumberComplete(value: string): boolean {
+  return value.replace(/\D/g, '').length === 10
+}
+
 /** 생년월일은 8자리 4-2-2 로 고정이다. 시안 표기가 0000.00.00 이라 점으로 잇는다. */
 export function formatBirthDate(raw: string): string {
   return join(digitsOf(raw, 8), [4, 2, 2], '.')

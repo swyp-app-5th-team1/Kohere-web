@@ -5,7 +5,7 @@ import type { LoginAttempts } from '../api/auth'
 import { ApiError } from '../api/client'
 import { KohereLogo } from '../components/KohereLogo'
 import { AccountLockedDialog, LoginFailedDialog } from '../components/LoginDialogs'
-import { inputClass, passwordMaskClass } from '../components/form/Field'
+import { inputClass } from '../components/form/Field'
 import eyeHiddenUrl from '../assets/icon-eye-hidden.png'
 
 type LocationState = { from?: { pathname?: string } }
@@ -14,7 +14,6 @@ type LocationState = { from?: { pathname?: string } }
 type Dialog = 'failed' | 'locked' | null
 
 const fieldClass = `${inputClass} font-semibold`
-const passwordFieldClass = `${fieldClass} ${passwordMaskClass}`
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -98,7 +97,7 @@ export default function LoginPage() {
                 placeholder="비밀번호"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                className={`${passwordFieldClass} pr-12`}
+                className={`${fieldClass} pr-12`}
               />
               <button
                 type="button"

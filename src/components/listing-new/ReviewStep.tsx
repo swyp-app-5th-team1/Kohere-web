@@ -11,8 +11,11 @@ type ReviewStepProps = {
   draft: ListingDraft
   photos: Photo[]
   roomPhotos: Record<string, Photo[]>
-  onSaveDraft: () => void
+  onSaveDraft?: () => void
+  /** 수정 모드의 마지막 확인 화면에서 입력 단계로 돌아간다. */
+  onPrev?: () => void
   onSubmit: () => void
+  editing?: boolean
   /** 보내는 중이면 버튼을 잠근다. 두 번 누르면 매물이 두 개 생긴다. */
   submitting: boolean
   submitError: string | null
@@ -47,7 +50,9 @@ export function ReviewStep({
   photos,
   roomPhotos,
   onSaveDraft,
+  onPrev,
   onSubmit,
+  editing = false,
   submitting,
   submitError,
 }: ReviewStepProps) {
@@ -120,23 +125,33 @@ export function ReviewStep({
 
         <div className="flex w-full justify-center">
           <div className="flex w-[423px] items-start gap-2.5">
-            <button
-              type="button"
-              onClick={() => {
-                onSaveDraft()
-                setSaved(true)
-              }}
-              className="bg-cool-neutral-20 border-line-alternative flex h-12 min-w-0 flex-1 cursor-pointer items-center justify-center rounded-2xl border px-3 text-base leading-6 font-semibold text-white transition-colors hover:brightness-105"
-            >
-              {saved ? '저장했어요' : '임시 저장'}
-            </button>
+            {editing ? (
+              <button
+                type="button"
+                onClick={onPrev}
+                className="bg-cool-neutral-20 border-line-alternative flex h-12 min-w-0 flex-1 cursor-pointer items-center justify-center rounded-2xl border px-3 text-base leading-6 font-semibold text-white transition-colors hover:brightness-105"
+              >
+                이전
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  onSaveDraft?.()
+                  setSaved(true)
+                }}
+                className="bg-cool-neutral-20 border-line-alternative flex h-12 min-w-0 flex-1 cursor-pointer items-center justify-center rounded-2xl border px-3 text-base leading-6 font-semibold text-white transition-colors hover:brightness-105"
+              >
+                {saved ? '저장했어요' : '임시 저장'}
+              </button>
+            )}
             <button
               type="button"
               onClick={onSubmit}
               disabled={submitting}
               className="bg-cool-neutral-80 border-line-alternative disabled:bg-cool-neutral-20 flex h-12 min-w-0 flex-1 cursor-pointer items-center justify-center rounded-2xl border px-3 text-base leading-6 font-semibold text-white transition-colors hover:brightness-125 disabled:cursor-not-allowed disabled:hover:brightness-100"
             >
-              {submitting ? '보내는 중…' : '제출하기'}
+              {submitting ? '보내는 중…' : editing ? '수정 요청하기' : '제출하기'}
             </button>
           </div>
         </div>

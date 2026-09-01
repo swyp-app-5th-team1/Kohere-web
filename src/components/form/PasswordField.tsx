@@ -1,5 +1,5 @@
 import { useState, type InputHTMLAttributes } from 'react'
-import { inputClass, inputErrorClass, passwordMaskClass } from './Field'
+import { inputClass, inputErrorClass } from './Field'
 import eyeHiddenUrl from '../../assets/icon-eye-hidden.png'
 
 type PasswordFieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> & {
@@ -21,8 +21,6 @@ export function PasswordField({ error = false, className = '', ...rest }: Passwo
 
   const shape =
     (error ? inputErrorClass : inputClass) +
-    ' ' +
-    passwordMaskClass +
     // 아이콘 상자(40) 자리를 비워 둔다.
     ' pr-11' +
     (className ? ' ' + className : '')

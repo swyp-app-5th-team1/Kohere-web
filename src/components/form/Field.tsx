@@ -29,18 +29,6 @@ export const inputClass =
 export const inputErrorClass =
   inputShape + ' border-status-red-50 bg-status-red-5 text-cool-neutral-70'
 
-/*
- * 비밀번호 칸에 덧붙이는 마스킹 점 크기.
- *
- * 마스킹 문자(●)는 브라우저가 정하는 것이라 CSS 로 바꿀 수 없다. 다만 그 점이 폰트
- * 글리프라 font-size 를 따라가고, 글리프가 em 대비 작아서 시안의 굵은 원에 맞추려면
- * 본문(18px)보다 크게 줘야 한다.
- *
- * 값이 있을 때만 거는 이유는 placeholder 문구까지 30px 로 커지기 때문이다.
- */
-export const passwordMaskClass =
-  'not-placeholder-shown:text-[30px] not-placeholder-shown:tracking-[0.12em]'
-
 /**
  * 입력칸 바로 아래에 붙는 오류 문구 (시안 224:31092).
  *
@@ -69,12 +57,14 @@ export function Checkbox({
   onChange: (next: boolean) => void
 }) {
   return (
-    <>
+    <span className="relative flex size-4 shrink-0">
       <input
         type="checkbox"
         checked={checked}
         onChange={(event) => onChange(event.target.checked)}
-        className="peer sr-only"
+        // 화면 밖으로 보내는 sr-only 방식은 긴 내부 스크롤에서 포커스될 때 Chrome이
+        // 숨은 input 위치로 스크롤을 당길 수 있다. 보이는 상자 위에 투명하게 겹친다.
+        className="peer absolute inset-0 z-10 size-full cursor-pointer opacity-0"
       />
       {/*
         체크 표시 색을 상자에서 물려준다(currentColor). peer-checked 는 형제에만 걸려서
@@ -82,7 +72,7 @@ export function Checkbox({
       */}
       <span
         aria-hidden
-        className="border-neutral-30 peer-focus-visible:ring-primary-40 peer-checked:border-primary-40 peer-checked:bg-primary-40 flex size-4 shrink-0 items-center justify-center rounded-[2px] border bg-white text-transparent transition-colors peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-offset-1"
+        className="border-neutral-30 peer-focus-visible:ring-primary-40 peer-checked:border-primary-40 peer-checked:bg-primary-40 flex size-full items-center justify-center rounded-[2px] border bg-white text-transparent transition-colors peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-offset-1"
       >
         <svg viewBox="0 0 16 16" className="size-3">
           <path
@@ -95,7 +85,7 @@ export function Checkbox({
           />
         </svg>
       </span>
-    </>
+    </span>
   )
 }
 

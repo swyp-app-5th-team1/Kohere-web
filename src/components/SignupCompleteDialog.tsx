@@ -22,7 +22,7 @@ export function SignupCompleteDialog({ open, onClose }: SignupCompleteDialogProp
       <button
         type="button"
         onClick={onClose}
-        className="border-line-alternative bg-cool-neutral-20 flex h-12 w-full items-center justify-center rounded-2xl border px-3 text-base leading-6 font-semibold text-white transition hover:brightness-105"
+        className="border-line-alternative bg-primary-40 flex h-12 w-full items-center justify-center rounded-2xl border px-3 text-base leading-6 font-semibold text-white transition hover:brightness-105"
       >
         로그인하러 가기
       </button>

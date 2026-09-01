@@ -1,4 +1,5 @@
 import { ApiError, api } from './client'
+import type { CodeLabel } from './types'
 
 /*
  * 매물 등록 폼을 채우는 조회 API 둘.
@@ -92,22 +93,16 @@ export function searchNearbyStations(
  * (`GET /api/v2/listings/*` permitAll)에 먼저 잡혀 비로그인에 열리기 때문이다.
  */
 const MY_LISTINGS_PATH = '/api/v2/users/me/listings'
+const LISTINGS_PATH = '/api/v2/listings'
 
 /** 카드 상태 배지. 서버가 번역 없이 코드 문자열 그대로 주므로 한글은 화면이 붙인다. */
 export type MyListingStatus = 'PENDING' | 'PUBLISHED' | 'REJECTED' | 'UPDATE_PENDING'
 
 export type MyListingEntry = {
-  /** 세입자 목록 카드와 같은 구조. 카드에 쓰는 값만 추려 담았다. */
-  listing: {
-    listingId: string
-    title: string
-    type: { code: string; label: string }
-    status: MyListingStatus
-    /** 첫 값이 대표 이미지다. */
-    imageUrls: string[]
-  }
-  /** 반려된 매물에만 있고, 그 외에는 null 이 아니라 필드 자체가 생략된다. */
-  rejectionReason?: string
+  /** 목록 응답 안에 상세 화면에서 쓸 등록 정보가 함께 들어온다. */
+  listing: ListingDetail
+  /** 명세는 nullable 이며, 반려 상태가 아니면 키 자체가 빠질 수도 있다. */
+  rejectionReason?: string | null
 }
 
 export type MyListingsResult = {
@@ -132,6 +127,192 @@ export function fetchMyListings(): Promise<MyListingsResult> {
   return api.get<MyListingsResult>(`${MY_LISTINGS_PATH}?size=100`)
 }
 
+export type ListingFacilities = {
+  providedSupplies: CodeLabel[]
+  securityFeatures: CodeLabel[]
+  heatingSystem: CodeLabel[]
+  commonSpaces: CodeLabel[]
+  laundry: CodeLabel[]
+  livingAmenities: CodeLabel[]
+  kitchen: CodeLabel[]
+}
+
+export type ListingRoomOffer = {
+  contract: {
+    maxStayMonths: number
+    minStayMonths: number
+  }
+  roomOfferId: string
+  name: string
+  filterTags: CodeLabel[]
+  roomImageUrls: string[]
+  pricing: {
+    maintenanceFee: number
+    deposit: number
+    currency: 'KRW'
+    monthlyRent: number
+  }
+  status: 'ACTIVE'
+}
+
+/** 목록 응답의 listing 중 현재 목록·상세 화면에서 사용하는 필드. */
+export type ListingDetail = {
+  listingId: string
+  title: string
+  type: CodeLabel
+  status: MyListingStatus
+  /** 최초 등록 시각과 마지막 수정 시각은 서로 덮어쓰지 않고 별도로 유지된다. */
+  createdAt: string
+  updatedAt: string
+  rentalType: CodeLabel
+  refundPolicy: string
+  genderPolicy: CodeLabel
+  arcRequired: CodeLabel
+  ageMin: number
+  ageMax: number
+  languagesSupported: CodeLabel[]
+  contact: {
+    managerName: string
+    phone: string
+  }
+  blogUrl?: string | null
+  location: {
+    lat: number
+    lng: number
+  }
+  address: {
+    city: CodeLabel
+    district: CodeLabel
+    fullAddress: string
+    detail: string | null
+  }
+  nearestTransit: {
+    type: CodeLabel
+    name: string
+    walkMinutes: number
+  }
+  nearbyFacilities: CodeLabel[]
+  building: {
+    type: CodeLabel
+    usedFloorMin: number
+    usedFloorMax: number
+    totalFloors: number
+    parkingAvailable: boolean
+    elevatorAvailable: boolean
+  }
+  facilities: ListingFacilities
+  conditions: CodeLabel[]
+  roomOffers: ListingRoomOffer[]
+  description: string
+  extraNotes: string
+  imageUrls: string[]
+}
+
+/** 수정 폼 전용 방 정보. 공개 상세와 달리 내려둔 방과 확정 사진 키까지 포함한다. */
+export type EditableListingRoom = {
+  roomOfferId: string
+  status: 'ACTIVE' | 'INACTIVE'
+  name: string
+  contract: {
+    minStayMonths: number
+    maxStayMonths: number
+  }
+  pricing: {
+    monthlyRent: number
+    deposit: number
+    maintenanceFee: number
+    currency: 'KRW'
+  }
+  /** 수정 전용 응답은 표시 라벨 없이 서버 코드만 준다. */
+  filterTags: string[]
+  /** 화면에는 URL을 쓰고, 수정 요청에는 같은 순서의 key를 쓴다. */
+  roomImageUrls: string[]
+  roomImageKeys: string[]
+}
+
+/** `GET /api/v2/users/me/listings/{listingId}`의 수정 폼 전용 응답. */
+export type EditableListingDetail = {
+  /** 표시용 공개 상세. 좌표·주소·카탈로그 라벨도 여기서 가져온다. */
+  listing: ListingDetail
+  /** 공개 상세에는 빠지는 INACTIVE 방과 기존 사진 key를 함께 준다. */
+  rooms: EditableListingRoom[]
+  status: MyListingStatus
+  businessRegistrationNumber: string
+  preferredNationalities: string[]
+  contractDifficulties: string[]
+  serviceFeedback?: string | null
+  imageKeys: string[]
+  rejectionReason?: string | null
+}
+
+/** 수정 화면을 채울 내 매물 한 건. 상태와 무관하게 조회되며 남의 매물은 404다. */
+export function fetchEditableListing(
+  listingId: string,
+  signal?: AbortSignal,
+): Promise<EditableListingDetail> {
+  return api.get<EditableListingDetail>(
+    `${MY_LISTINGS_PATH}/${encodeURIComponent(listingId)}`,
+    { signal },
+  )
+}
+
+/** 전체 교체 방식의 매물 수정. 성공 상태는 서버가 PENDING 또는 UPDATE_PENDING으로 정한다. */
+export function updateListing(
+  listingId: string,
+  payload: unknown,
+): Promise<EditableListingDetail> {
+  return api.put<EditableListingDetail>(
+    `${LISTINGS_PATH}/${encodeURIComponent(listingId)}`,
+    payload,
+  )
+}
+
+export function editableListingErrorMessage(error: unknown): string {
+  if (!(error instanceof ApiError)) {
+    return '매물 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'
+  }
+
+  switch (error.code) {
+    case 'LISTING_NOT_FOUND':
+      return '수정할 매물을 찾을 수 없습니다.'
+    case 'FORBIDDEN':
+    case 'AUTH_ONBOARDING_REQUIRED':
+      return '임대인 계정으로 로그인해야 매물을 수정할 수 있습니다.'
+    default:
+      return '매물 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'
+  }
+}
+
+export function updateListingErrorMessage(error: unknown): string {
+  if (!(error instanceof ApiError)) {
+    return '수정 요청 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.'
+  }
+
+  switch (error.code) {
+    case 'INVALID_INPUT':
+      return error.fieldErrors[0]?.reason ?? '입력한 내용을 다시 확인해 주세요.'
+    case 'LISTING_UNKNOWN_CATALOG_CODE':
+      return '선택한 항목 중 서버가 모르는 값이 있습니다. 잠시 후 다시 시도해 주세요.'
+    case 'LISTING_IMAGE_REQUIRED':
+      return '대표 사진은 1~5장, 각 객실 사진은 2~5장으로 등록해 주세요.'
+    case 'LISTING_IMAGE_KEY_NOT_FOUND':
+      return '사진 정보를 확인할 수 없습니다. 사진을 다시 올려 주세요.'
+    case 'LISTING_STATE_CHANGED':
+      return '매물의 심사 상태가 변경되었습니다. 목록에서 다시 확인해 주세요.'
+    case 'LISTING_NOT_EDITABLE':
+      return '현재 심사 중인 매물은 수정할 수 없습니다.'
+    case 'LISTING_NOT_FOUND':
+      return '수정할 매물을 찾을 수 없습니다.'
+    case 'FORBIDDEN':
+    case 'AUTH_ONBOARDING_REQUIRED':
+      return '임대인 계정으로 로그인해야 매물을 수정할 수 있습니다.'
+    case 'UPSTREAM_ERROR':
+      return '사진 저장소가 일시적으로 불안정합니다. 잠시 후 다시 요청해 주세요.'
+    default:
+      return '수정 요청 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.'
+  }
+}
+
 /** 목록 조회 실패 문구. */
 export function myListingsErrorMessage(error: unknown): string {
   if (!(error instanceof ApiError)) {
@@ -148,8 +329,6 @@ export function myListingsErrorMessage(error: unknown): string {
   }
 }
 
-const CREATE_PATH = '/api/v2/listings'
-
 /**
  * 등록 응답에서 화면이 쓰는 값만 추린다.
  *
@@ -163,7 +342,7 @@ export type CreatedListing = {
 
 /** 매물을 등록한다. 사진은 미리 올려 둔 key 로 실려 간다. */
 export function createListing(payload: unknown): Promise<CreatedListing> {
-  return api.post<CreatedListing>(CREATE_PATH, payload)
+  return api.post<CreatedListing>(LISTINGS_PATH, payload)
 }
 
 /** 등록 실패 문구. 분기는 error.code 로 한다. */

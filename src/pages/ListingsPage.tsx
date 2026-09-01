@@ -172,17 +172,18 @@ export default function ListingsPage() {
             </div>
 
             <div className="flex w-full flex-col gap-[25px]">
-              {entries.map(({ listing }) => (
+              {entries.map((entry) => (
                 <Link
-                  key={listing.listingId}
-                  to={`/listings/${listing.listingId}`}
+                  key={entry.listing.listingId}
+                  to={`/listings/${entry.listing.listingId}`}
+                  state={{ entry }}
                   className={cardClass}
                 >
-                  <CardThumbnail url={listing.imageUrls[0] ?? null} />
+                  <CardThumbnail url={entry.listing.imageUrls[0] ?? null} />
                   <CardBody
-                    title={listing.title}
-                    subtitle={listing.type.label}
-                    badge={STATUS_BADGES[listing.status]}
+                    title={entry.listing.title}
+                    subtitle={entry.listing.type.label}
+                    badge={STATUS_BADGES[entry.listing.status]}
                   />
                 </Link>
               ))}

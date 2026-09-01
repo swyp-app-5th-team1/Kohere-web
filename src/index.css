@@ -26,6 +26,7 @@
   --color-cool-neutral-80: #292a2d;
 
   --color-neutral-10: #dcdcdc;
+  --color-neutral-5: #f7f7f7;
   --color-neutral-30: #999999;
   --color-neutral-50: #767676;
   --color-neutral-70: #505050;
@@ -33,15 +34,20 @@
   /* 입력 필드 오류 상태 */
   --color-status-red-5: #fee7ea;
   --color-status-red-50: #f71229;
+  --color-status-red-99: #310408;
 
   --color-gray-200: #e5e7ea;
   --color-gray-300: #d3d5dc;
 
   --color-label-normal: #171719;
+  --color-label-strong: #000000;
   --color-label-neutral: rgba(41, 42, 45, 0.8);
   --color-label-alternative: rgba(55, 56, 60, 0.72);
   --color-line-normal: rgba(112, 115, 124, 0.24);
   --color-line-alternative: rgba(112, 115, 124, 0.08);
+
+  /* Figma 마이페이지 제목 토큰. 70과 80 사이의 원본 팔레트 값이다. */
+  --color-cool-neutral-75: #37383c;
 
   --font-sans:
     "Pretendard JP", Pretendard, -apple-system, BlinkMacSystemFont, system-ui,

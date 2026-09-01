@@ -11,6 +11,8 @@ import LoginPage from './pages/LoginPage'
 import NotFoundPage from './pages/NotFoundPage'
 import OnboardingPage from './pages/OnboardingPage'
 import ProfilePage from './pages/ProfilePage'
+import ProfileEditPage from './pages/ProfileEditPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
 import SignupPage from './pages/SignupPage'
 
 export default function App() {
@@ -28,6 +30,8 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
       <Route path="/find-account" element={<FindAccountPage />} />
+      {/* 메일로 보낸 재설정 링크가 도착하는 곳. 링크의 token 이 본인 확인을 대신한다. */}
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
 
       {/* 로그인 필요 */}
       <Route element={<RequireAuth />}>
@@ -35,8 +39,10 @@ export default function App() {
         <Route path="/onboarding" element={<OnboardingPage />} />
         <Route path="/listings" element={<ListingsPage />} />
         <Route path="/listings/new" element={<ListingNewPage />} />
+        <Route path="/listings/:listingId/edit" element={<ListingNewPage />} />
         <Route path="/listings/:listingId" element={<ListingDetailPage />} />
         <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/profile/edit" element={<ProfileEditPage />} />
         {/* 관리자 권한 확인은 서버 응답으로 판단해 추가한다. 지금은 경로만 잡아둔다. */}
         <Route path="/admin" element={<AdminPage />} />
       </Route>

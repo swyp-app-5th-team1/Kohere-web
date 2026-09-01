@@ -1,22 +1,24 @@
 import { Chip, ChipGroup } from '../form/Chip'
-import { Field, inputClass } from '../form/Field'
+import { Field, FieldError } from '../form/Field'
 import { PhotoPicker, type Photo } from '../form/PhotoPicker'
+import { useTouched } from '../form/useTouched'
+import { TextField } from '../form/TextField'
 import { StepFooter } from './StepFooter'
+import { StepTitle } from './StepTitle'
+import { StepBody } from './StepBody'
+import {
+  digitsOnly,
+  moneyError,
+  parseMoney,
+  parseMonths,
+  stayError,
+  stayMaxError,
+} from './amounts'
+import { ROOM_FILTER_TAGS } from './catalogs'
 import { createRoomType, type RoomTypeDraft } from './draft'
 import chevronUrl from '../../assets/icon-chevron-down.svg'
 import plusUrl from '../../assets/icon-plus.svg'
 import trashUrl from '../../assets/icon-trash.svg'
-
-const ROOM_OPTIONS = [
-  '전입신고 가능',
-  '개인 화장실/개인 욕실',
-  '2인실',
-  '식사 제공',
-  '즉시 입주',
-  '영어 소통 가능',
-  '여성 전용',
-  '관리비 없음',
-]
 
 /** 객실 사진은 시안이 2장 이상을 요구한다. */
 const ROOM_PHOTO_MIN = 2
@@ -28,9 +30,37 @@ function roomTypeLabel(room: RoomTypeDraft, index: number) {
   return room.name.trim() || `${String.fromCharCode(65 + index)} 타입`
 }
 
+/**
+ * 방 한 줄에서 서버로 보낼 숫자를 읽어 낸다.
+ *
+ * 칸이 숫자만 받으니 대개 그대로 읽힌다. 오류는 칸을 거치지 않고 들어온 값(임시 저장에서
+ * 되살린 옛 draft)이나 0 개월 · 최대 < 최소 를 잡는 안전망이다. 하나라도 걸리면 다음으로
+ * 못 넘어간다(amounts.ts 참고).
+ */
+function readRoom(room: RoomTypeDraft) {
+  const minStay = parseMonths(room.minPeriod)
+
+  return {
+    deposit: parseMoney(room.deposit),
+    maintenanceFee: parseMoney(room.maintenanceFee),
+    monthlyRent: parseMoney(room.monthlyRent),
+    minStay,
+    maxStay: parseMonths(room.maxPeriod),
+    errors: {
+      deposit: moneyError(room.deposit),
+      maintenanceFee: moneyError(room.maintenanceFee),
+      monthlyRent: moneyError(room.monthlyRent),
+      minStay: stayError(room.minPeriod),
+      maxStay: stayMaxError(room.maxPeriod, minStay),
+    },
+  }
+}
+
 type RoomTypesStepProps = {
   value: RoomTypeDraft[]
   onChange: (next: RoomTypeDraft[]) => void
+  /** 수정 모드에서 기존 방을 배열에서 버리지 않고 INACTIVE 요청으로 보존한다. */
+  onRemoveRoom?: (room: RoomTypeDraft) => void
   /** 펼쳐진 방 타입의 id. 하나만 펼친다. */
   expandedId: string | null
   onExpandedChange: (id: string | null) => void
@@ -38,6 +68,8 @@ type RoomTypesStepProps = {
   onAddPhotos: (roomId: string, files: File[]) => void
   onRemovePhoto: (roomId: string, index: number) => void
   onMakePhotoPrimary: (roomId: string, index: number) => void
+  onMovePhoto: (roomId: string, from: number, to: number) => void
+  photoFailures: Record<string, { name: string; reason: string }[]>
   onPrev: () => void
   onNext: () => void
 }
@@ -46,15 +78,21 @@ type RoomTypesStepProps = {
 export function RoomTypesStep({
   value,
   onChange,
+  onRemoveRoom,
   expandedId,
   onExpandedChange,
   photos,
   onAddPhotos,
   onRemovePhoto,
   onMakePhotoPrimary,
+  onMovePhoto,
+  photoFailures,
   onPrev,
   onNext,
 }: RoomTypesStepProps) {
+  /* 방이 여럿이라 방 id 를 열쇠에 섞는다. */
+  const touched = useTouched()
+
   const patchRoom = (id: string, values: Partial<RoomTypeDraft>) => {
     onChange(value.map((room) => (room.id === id ? { ...room, ...values } : room)))
   }
@@ -66,6 +104,8 @@ export function RoomTypesStep({
   }
 
   const removeRoom = (id: string) => {
+    const room = value.find((item) => item.id === id)
+    if (room) onRemoveRoom?.(room)
     onChange(value.filter((room) => room.id !== id))
     if (expandedId === id) onExpandedChange(null)
   }
@@ -78,30 +118,38 @@ export function RoomTypesStep({
     })
   }
 
-  const filled = value.every(
-    (room) =>
+  /* 채워졌는지만 보지 않는다 — 읽어 낼 수 있는 모양인지까지 봐야 서버에서 400 이 안 난다. */
+  const filled = value.every((room) => {
+    const read = readRoom(room)
+
+    return (
       room.name.trim() !== '' &&
-      room.deposit.trim() !== '' &&
-      room.maintenanceFee.trim() !== '' &&
-      room.monthlyRent.trim() !== '' &&
-      room.minPeriod.trim() !== '' &&
-      room.maxPeriod.trim() !== '' &&
+      read.deposit !== null &&
+      read.maintenanceFee !== null &&
+      read.monthlyRent !== null &&
+      read.minStay !== null &&
+      read.maxStay !== null &&
+      Object.values(read.errors).every((error) => error === null) &&
       room.options.length > 0 &&
-      (photos[room.id]?.length ?? 0) >= ROOM_PHOTO_MIN,
-  )
+      (photos[room.id]?.length ?? 0) >= ROOM_PHOTO_MIN
+    )
+  })
 
   return (
     <>
-      <main className="flex w-full flex-1 flex-col items-center px-6 py-14">
+      <StepBody>
         <div className="flex w-full max-w-[980px] flex-col gap-8">
-          <h1 className="text-[32px] leading-6 font-bold text-[#242424]">
-            각 방과 가격 정보를 입력해주세요.
-          </h1>
+          <StepTitle>각 방과 가격 정보를 입력해주세요.</StepTitle>
 
           <div className="flex w-full flex-col gap-6">
             {value.map((room, index) => {
               const expanded = room.id === expandedId
               const roomPhotos = photos[room.id] ?? []
+              const read = readRoom(room)
+
+              /* 다음 버튼은 read.errors 로 잠그고, 빨간 문구는 다녀간 칸에만 그린다. */
+              const shown = (field: keyof typeof read.errors) =>
+                touched.error(`${room.id}:${field}`, read.errors[field])
 
               const actions = (
                 <div className="flex shrink-0 items-center gap-2.5">
@@ -150,91 +198,139 @@ export function RoomTypesStep({
                   <div className="flex w-full items-start gap-8">
                     <div className="min-w-0 flex-1">
                       <Field label="방 이름">
-                        <input
+                        <TextField
                           value={room.name}
                           onChange={(event) => patchRoom(room.id, { name: event.target.value })}
                           placeholder="입력"
-                          className={inputClass + ' font-medium'}
+                          className="font-medium"
                         />
                       </Field>
                     </div>
                     {actions}
                   </div>
 
+                  {/*
+                    금액 세 칸과 이용기간 두 칸은 숫자만 쳐진다 — 한글도 「만원」도 안
+                    들어간다(amounts.ts 참고). 대신 단위를 칸 안에 붙여 둔다. 시안
+                    placeholder(「입력하기」·「최소」)에는 단위가 없어서, 원 단위로 다 적어야
+                    하는 것도 이용기간이 개월인 것도 알 길이 없다.
+                  */}
                   <Field label="보증금">
-                    <input
-                      value={room.deposit}
-                      onChange={(event) => patchRoom(room.id, { deposit: event.target.value })}
-                      placeholder="입력하기"
-                      className={inputClass + ' font-medium'}
-                    />
+                    <div className="flex w-full flex-col gap-1">
+                      <TextField
+                        value={room.deposit}
+                        suffix="원"
+                        inputMode="numeric"
+                        error={shown('deposit') !== null}
+                        onChange={(event) => patchRoom(room.id, { deposit: digitsOnly(event.target.value) })}
+                        onBlur={() => touched.touch(`${room.id}:deposit`)}
+                        placeholder="입력하기"
+                        className="font-medium"
+                      />
+                      {shown('deposit') && <FieldError>{shown('deposit')}</FieldError>}
+                    </div>
                   </Field>
 
-                  <div className="flex w-full gap-8">
+                  <div className="flex w-full items-start gap-8">
                     <div className="min-w-0 flex-1">
-                      <Field label="관리비">
-                        <input
-                          value={room.maintenanceFee}
-                          onChange={(event) =>
-                            patchRoom(room.id, { maintenanceFee: event.target.value })
-                          }
-                          placeholder="입력하기"
-                          className={inputClass + ' font-medium'}
-                        />
+                      <Field
+                        label="관리비"
+                      >
+                        <div className="flex w-full flex-col gap-1">
+                          <TextField
+                            value={room.maintenanceFee}
+                            suffix="원"
+                            inputMode="numeric"
+                            error={shown('maintenanceFee') !== null}
+                            onChange={(event) =>
+                              patchRoom(room.id, { maintenanceFee: digitsOnly(event.target.value) })
+                            }
+                            onBlur={() => touched.touch(`${room.id}:maintenanceFee`)}
+                            placeholder="입력하기"
+                            className="font-medium"
+                          />
+                          {shown('maintenanceFee') && <FieldError>{shown('maintenanceFee')}</FieldError>}
+                        </div>
                       </Field>
                     </div>
                     <div className="min-w-0 flex-1">
-                      <Field label="월세">
-                        <input
-                          value={room.monthlyRent}
-                          onChange={(event) =>
-                            patchRoom(room.id, { monthlyRent: event.target.value })
-                          }
-                          placeholder="입력하기"
-                          className={inputClass + ' font-medium'}
-                        />
+                      <Field
+                        label="월세"
+                      >
+                        <div className="flex w-full flex-col gap-1">
+                          <TextField
+                            value={room.monthlyRent}
+                            suffix="원"
+                            inputMode="numeric"
+                            error={shown('monthlyRent') !== null}
+                            onChange={(event) =>
+                              patchRoom(room.id, { monthlyRent: digitsOnly(event.target.value) })
+                            }
+                            onBlur={() => touched.touch(`${room.id}:monthlyRent`)}
+                            placeholder="입력하기"
+                            className="font-medium"
+                          />
+                          {shown('monthlyRent') && <FieldError>{shown('monthlyRent')}</FieldError>}
+                        </div>
                       </Field>
                     </div>
                   </div>
 
-                  <div className="flex w-full items-end gap-2.5">
-                    <div className="min-w-0 flex-1">
-                      <Field label="이용기간">
-                        <input
-                          value={room.minPeriod}
-                          onChange={(event) => patchRoom(room.id, { minPeriod: event.target.value })}
-                          placeholder="최소"
-                          className={inputClass + ' font-medium'}
-                        />
-                      </Field>
-                    </div>
-                    <span className="text-neutral-70 flex h-14 shrink-0 items-center text-lg leading-6">
-                      ~
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      {/* 오른쪽 칸은 라벨이 없지만 시안에서 높이를 맞춰 두었다. */}
-                      <div className="flex w-full flex-col gap-1">
-                        <div className="h-6" aria-hidden />
-                        <input
-                          value={room.maxPeriod}
-                          onChange={(event) => patchRoom(room.id, { maxPeriod: event.target.value })}
-                          placeholder="최대"
-                          aria-label="이용기간 최대"
-                          className={inputClass + ' font-medium'}
-                        />
+                  {/*
+                    이용기간의 단위는 **개월**이다 (`minStayMonths` · `maxStayMonths`).
+                    라벨이 왼쪽 칸에만 붙는 시안이라 두 칸을 한 Field 안에 넣었다.
+                  */}
+                  <Field
+                    label="이용기간"
+                  >
+                    <div className="flex w-full flex-col gap-1">
+                      <div className="flex w-full items-center gap-2.5">
+                        <div className="min-w-0 flex-1">
+                          <TextField
+                            value={room.minPeriod}
+                            suffix="개월"
+                            inputMode="numeric"
+                            error={shown('minStay') !== null}
+                            onChange={(event) =>
+                              patchRoom(room.id, { minPeriod: digitsOnly(event.target.value) })
+                            }
+                            onBlur={() => touched.touch(`${room.id}:minStay`)}
+                            placeholder="최소"
+                            aria-label="이용기간 최소"
+                            className="font-medium"
+                          />
+                        </div>
+                        <span className="text-neutral-70 shrink-0 text-lg leading-6">~</span>
+                        <div className="min-w-0 flex-1">
+                          <TextField
+                            value={room.maxPeriod}
+                            suffix="개월"
+                            inputMode="numeric"
+                            error={shown('maxStay') !== null}
+                            onChange={(event) =>
+                              patchRoom(room.id, { maxPeriod: digitsOnly(event.target.value) })
+                            }
+                            onBlur={() => touched.touch(`${room.id}:maxStay`)}
+                            placeholder="최대"
+                            aria-label="이용기간 최대"
+                            className="font-medium"
+                          />
+                        </div>
                       </div>
+                      {shown('minStay') && <FieldError>{shown('minStay')}</FieldError>}
+                      {shown('maxStay') && <FieldError>{shown('maxStay')}</FieldError>}
                     </div>
-                  </div>
+                  </Field>
 
                   <Field label="각 방 타입별 옵션">
                     <ChipGroup>
-                      {ROOM_OPTIONS.map((option) => (
+                      {ROOM_FILTER_TAGS.map((item) => (
                         <Chip
-                          key={option}
-                          selected={room.options.includes(option)}
-                          onClick={() => toggleOption(room, option)}
+                          key={item.code}
+                          selected={room.options.includes(item.code)}
+                          onClick={() => toggleOption(room, item.code)}
                         >
-                          {option}
+                          {item.label}
                         </Chip>
                       ))}
                     </ChipGroup>
@@ -246,6 +342,8 @@ export function RoomTypesStep({
                       onAdd={(files) => onAddPhotos(room.id, files)}
                       onRemove={(index) => onRemovePhoto(room.id, index)}
                       onMakePrimary={(index) => onMakePhotoPrimary(room.id, index)}
+                      onMove={(from, to) => onMovePhoto(room.id, from, to)}
+                      failures={photoFailures[room.id] ?? []}
                     />
                   </Field>
                 </div>
@@ -262,7 +360,7 @@ export function RoomTypesStep({
             </button>
           </div>
         </div>
-      </main>
+      </StepBody>
 
       <StepFooter step={5} onPrev={onPrev} onNext={onNext} nextDisabled={!filled} />
     </>

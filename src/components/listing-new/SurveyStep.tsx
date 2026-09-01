@@ -1,18 +1,11 @@
 import { Chip } from '../form/Chip'
 import { Field } from '../form/Field'
 import { StepFooter } from './StepFooter'
+import { StepTitle } from './StepTitle'
+import { StepBody } from './StepBody'
 import type { SurveyDraft } from './draft'
 
-const NATIONALITIES = ['일본', '미국', '중국', '동남아', '유럽']
-
-const DIFFICULTIES = [
-  '의사소통 문제(언어)',
-  '외국인 생활 관련 문제(문화)',
-  '낯선 외국인에 대한 두려움(신원)',
-  '대금 지급, 환율(결제)',
-  '손해배상, 위약금 관련(계약 이행)',
-  '외국인과의 소통 채널 부족(대화나 공지 전달의 어려움)',
-]
+import { CONTRACT_DIFFICULTIES, PREFERRED_NATIONALITIES } from './catalogs'
 
 const MESSAGE_MAX = 500
 
@@ -41,10 +34,10 @@ export function SurveyStep({ value, onChange, onPrev, onNext }: SurveyStepProps)
 
   return (
     <>
-      <main className="flex w-full flex-1 flex-col items-center px-6 py-14">
+      <StepBody>
         <div className="flex w-full max-w-[980px] flex-col gap-8">
           <div className="flex flex-col gap-1">
-            <h1 className="text-[32px] leading-6 font-bold text-[#242424]">추가 질문 사항 (선택)</h1>
+            <StepTitle>추가 질문 사항 (선택)</StepTitle>
             <p className="text-cool-neutral-30 text-xs leading-6 font-medium">
               더 나은 서비스를 만들기 위한 질문입니다. 답변 내용은 임차인에게 전달되지 않습니다.
             </p>
@@ -53,13 +46,15 @@ export function SurveyStep({ value, onChange, onPrev, onNext }: SurveyStepProps)
           <div className="flex w-full flex-col gap-6">
             <Field label="선호하는 국적">
               <div className="flex w-full flex-wrap gap-2">
-                {NATIONALITIES.map((item) => (
+                {PREFERRED_NATIONALITIES.map((item) => (
                   <Chip
-                    key={item}
-                    selected={value.nationalities.includes(item)}
-                    onClick={() => onChange({ nationalities: toggled(value.nationalities, item) })}
+                    key={item.code}
+                    selected={value.nationalities.includes(item.code)}
+                    onClick={() =>
+                      onChange({ nationalities: toggled(value.nationalities, item.code) })
+                    }
                   >
-                    {item}
+                    {item.label}
                   </Chip>
                 ))}
               </div>
@@ -68,13 +63,15 @@ export function SurveyStep({ value, onChange, onPrev, onNext }: SurveyStepProps)
             <Field label="외국인 임차인과 계약하는 과정에서 겪은 힘든 점, 어려운 점이 있다면 말씀해주세요.">
               {/* 시안에서 이 묶음만 칩을 세로로 쌓는다. */}
               <div className="flex w-full flex-col items-start gap-2">
-                {DIFFICULTIES.map((item) => (
+                {CONTRACT_DIFFICULTIES.map((item) => (
                   <Chip
-                    key={item}
-                    selected={value.difficulties.includes(item)}
-                    onClick={() => onChange({ difficulties: toggled(value.difficulties, item) })}
+                    key={item.code}
+                    selected={value.difficulties.includes(item.code)}
+                    onClick={() =>
+                      onChange({ difficulties: toggled(value.difficulties, item.code) })
+                    }
                   >
-                    {item}
+                    {item.label}
                   </Chip>
                 ))}
               </div>
@@ -98,7 +95,7 @@ export function SurveyStep({ value, onChange, onPrev, onNext }: SurveyStepProps)
             </Field>
           </div>
         </div>
-      </main>
+      </StepBody>
 
       <StepFooter step={6} onPrev={onPrev} onNext={onNext} nextLabel={answered ? '다음' : '건너뛰기'} />
     </>

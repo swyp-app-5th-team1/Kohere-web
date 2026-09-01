@@ -6,21 +6,48 @@ import type { SpaceType } from './spaceTypes'
  * 원래는 서버가 임시 저장본을 들고 있는 그림이었지만, 서버 작업이 늘어나서 일단 브라우저에
  * 둔다. 저장 시점은 각 단계에서 "다음" 을 누르는 순간이다 (입력할 때마다 쓰지 않는다).
  *
- * 사진은 File 객체라 JSON 으로 담을 수 없어 여기 넣지 않는다. 새로고침하면 사진만 사라진다.
- * 사진까지 살리려면 업로드 API 가 생긴 뒤 서버 URL 을 받아서 담아야 한다.
+ * 사진은 고르는 즉시 서버로 올리고 그때 받은 key · url 만 담는다. 둘 다 문자열이라
+ * JSON 으로 저장되고, 그래서 새로고침해도 사진이 살아남는다. 올리는 중이거나 실패한
+ * 사진은 File 이 있어야 다시 시도할 수 있는데 File 은 담기지 않아 제외한다.
  */
 
 const DRAFT_KEY = 'kohere.listingDraft'
 
+/**
+ * 임대인이 고른 인근 역.
+ *
+ * 등록 요청의 `nearestTransit` 에 그대로 실린다 — 이름은 서버가 준 표준 표기라
+ * 화면에서 순서를 바꾸거나 다듬으면 안 된다(`신촌역 2호선`).
+ */
+export type NearestTransitDraft = {
+  name: string
+  walkMinutes: number
+}
+
 export type BranchDraft = {
   name: string
+  /** 우편번호 5자리. 다음 우편번호가 함께 주는 값이라 버리지 않고 담아 둔다. */
+  postalCode: string
+  /**
+   * 표준 도로명 주소. 다음 우편번호가 준 문자열이 아니라 **주소 검색 API 가 준 값**이다.
+   * 아래 좌표와 짝이 맞아야 해서 그렇다.
+   */
   address: string
   addressDetail: string
-  nearbyStation: string
+  /**
+   * 주소의 좌표. 사용자가 입력하는 값이 아니라 주소를 고르면 따라온다.
+   *
+   * 메모리에만 두면 새로고침 때 주소는 남고 좌표만 사라져서, 다 채워진 것처럼 보이는데
+   * 제출이 실패한다. 그래서 임시 저장에 함께 담는다.
+   */
+  lat: number | null
+  lng: number | null
+  nearestTransit: NearestTransitDraft | null
   description: string
 }
 
 export type BuildingDraft = {
+  /** 서버 코드(`VILLA` 등)를 담는다. 화면 라벨은 buildingTypes.ts 가 짝지어 준다. */
   buildingType: string
   totalFloors: string
   operatingFloors: string
@@ -40,6 +67,10 @@ export type ConditionsDraft = {
 export type RoomTypeDraft = {
   /** 사진처럼 임시 저장 밖에 두는 값을 방 타입에 이어 붙이기 위한 열쇠. */
   id: string
+  /** 수정 모드에서만 있다. 새 방과 신규 등록 초안은 null이다. */
+  roomOfferId: string | null
+  /** 수정 모드에서 기존 방을 내릴 때 INACTIVE로 전체 교체 요청에 남긴다. */
+  status: 'ACTIVE' | 'INACTIVE'
   name: string
   deposit: string
   maintenanceFee: string
@@ -59,8 +90,6 @@ export type ContactDraft = {
   managerName: string
   phone: string
   businessNumber: string
-  agreedPrivacy: boolean
-  agreedExposure: boolean
 }
 
 export type ListingDraft = {
@@ -70,19 +99,39 @@ export type ListingDraft = {
   branch: BranchDraft
   building: BuildingDraft
   conditions: ConditionsDraft
-  /** 편의 시설은 "그룹명/순번/항목" 형태의 키로 담는다. */
+  /** 편의 시설은 "그룹키:코드" 형태로 담는다. */
   amenities: string[]
   roomTypes: RoomTypeDraft[]
   survey: SurveyDraft
   contact: ContactDraft
+  /** 등록 화면에는 칸이 없지만, 수정 전체 교체 때 기존 값을 지우지 않기 위해 보존한다. */
+  blogUrl: string | null
+  /** 지점 대표사진. 첫 장이 대표라 순서가 그대로 등록 요청에 실린다. */
+  branchPhotos: StoredPhoto[]
+  /** 방 타입 id 별 객실 사진. */
+  roomPhotos: Record<string, StoredPhoto[]>
 }
 
-let roomTypeSeq = 0
+/**
+ * 임시 저장에 담는 사진.
+ *
+ * 업로드를 마친 것만 담는다 — 올리는 중이거나 실패한 사진은 `File` 이 있어야 다시 시도할
+ * 수 있는데 File 은 JSON 으로 담기지 않는다. 서버에 올라간 사진은 7일간 살아 있어서,
+ * 새로고침해도 key 만 들고 있으면 그대로 쓸 수 있다.
+ */
+export type StoredPhoto = {
+  id: string
+  /** 서버가 준 미리보기 주소. 등록이 끝나면 무효가 되지만 폼을 쓰는 동안은 유효하다. */
+  url: string
+  key: string
+}
 
 export function createRoomType(): RoomTypeDraft {
-  roomTypeSeq += 1
   return {
-    id: `room-${roomTypeSeq}`,
+    // 순번을 쓰면 새로고침 때 0 부터 다시 세는 바람에 저장돼 있던 방 타입과 id 가 겹친다.
+    id: crypto.randomUUID(),
+    roomOfferId: null,
+    status: 'ACTIVE',
     name: '',
     deposit: '',
     maintenanceFee: '',
@@ -98,7 +147,16 @@ export function emptyDraft(): ListingDraft {
   return {
     step: 0,
     spaceType: null,
-    branch: { name: '', address: '', addressDetail: '', nearbyStation: '', description: '' },
+    branch: {
+      name: '',
+      postalCode: '',
+      address: '',
+      addressDetail: '',
+      lat: null,
+      lng: null,
+      nearestTransit: null,
+      description: '',
+    },
     building: {
       buildingType: '',
       totalFloors: '',
@@ -121,9 +179,19 @@ export function emptyDraft(): ListingDraft {
       managerName: '',
       phone: '',
       businessNumber: '',
-      agreedPrivacy: false,
-      agreedExposure: false,
     },
+    blogUrl: null,
+    branchPhotos: [],
+    roomPhotos: {},
+  }
+}
+
+/** 저장본이 있는지만 본다. 등록 화면이 「이어서 하시겠습니까」 팝업을 띄울지 정할 때 쓴다. */
+export function hasSavedDraft(): boolean {
+  try {
+    return localStorage.getItem(DRAFT_KEY) !== null
+  } catch {
+    return false
   }
 }
 
@@ -136,7 +204,13 @@ export function loadDraft(): ListingDraft {
 
     // 저장해 둔 모양이 바뀌었어도 화면이 깨지지 않도록 빈 값 위에 덮어쓴다.
     const saved = JSON.parse(raw) as Partial<ListingDraft>
-    const roomTypes = saved.roomTypes?.length ? saved.roomTypes : empty.roomTypes
+    const roomTypes = saved.roomTypes?.length
+      ? saved.roomTypes.map((room) => ({
+          ...room,
+          roomOfferId: room.roomOfferId ?? null,
+          status: room.status ?? 'ACTIVE',
+        }))
+      : empty.roomTypes
 
     return {
       step: saved.step ?? 0,
@@ -148,6 +222,9 @@ export function loadDraft(): ListingDraft {
       roomTypes,
       survey: { ...empty.survey, ...saved.survey },
       contact: { ...empty.contact, ...saved.contact },
+      blogUrl: saved.blogUrl ?? null,
+      branchPhotos: saved.branchPhotos ?? [],
+      roomPhotos: saved.roomPhotos ?? {},
     }
   } catch {
     // 값이 깨졌거나 localStorage 를 못 쓰는 환경이면 빈 상태로 시작한다.

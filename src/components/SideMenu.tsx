@@ -147,16 +147,8 @@ export function SideMenu({ open, onClose }: SideMenuProps) {
               to="/admin"
               onClick={onClose}
               aria-current={pathname.startsWith('/admin') ? 'page' : undefined}
-              className={
-                'relative flex h-12 w-full items-center gap-3 pl-4 text-lg leading-6 font-semibold ' +
-                (pathname.startsWith('/admin')
-                  ? 'text-primary-40'
-                  : 'text-cool-neutral-40')
-              }
+              className="text-primary-40 flex h-12 w-full items-center gap-3 pl-4 text-lg leading-6 font-semibold"
             >
-              {pathname.startsWith('/admin') && (
-                <span aria-hidden="true" className="bg-primary-40 absolute inset-y-0 left-0 w-1" />
-              )}
               <AdminIcon />
               <span>관리자 페이지</span>
             </Link>

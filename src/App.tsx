@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { setSessionExpiredHandler } from './api/client'
 import { RequireAuth } from './routes/RequireAuth'
+import AdminListingReviewPage from './pages/AdminListingReviewPage'
 import AdminPage from './pages/AdminPage'
 import FindAccountPage from './pages/FindAccountPage'
 import ListingDetailPage from './pages/ListingDetailPage'
@@ -45,6 +46,7 @@ export default function App() {
         <Route path="/profile/edit" element={<ProfileEditPage />} />
         {/* 관리자 권한 확인은 서버 응답으로 판단해 추가한다. 지금은 경로만 잡아둔다. */}
         <Route path="/admin" element={<AdminPage />} />
+        <Route path="/admin/listings/:listingId" element={<AdminListingReviewPage />} />
       </Route>
 
       <Route path="*" element={<NotFoundPage />} />

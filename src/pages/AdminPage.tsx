@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   adminListingsErrorMessage,
   fetchAllAdminListings,
@@ -6,6 +7,7 @@ import {
 } from '../api/admin'
 import type { MyListingStatus } from '../api/listings'
 import { AppHeader } from '../components/AppHeader'
+import { STATUS_BADGES, statusBadgeClass } from '../components/admin/statusBadges'
 
 type StatusFilter = 'ALL' | MyListingStatus
 
@@ -27,13 +29,6 @@ const TABS: { status: StatusFilter; label: string }[] = [
   { status: 'UPDATE_PENDING', label: '수정매물' },
   { status: 'REJECTED', label: '반려매물' },
 ]
-
-const STATUS_BADGES: Record<MyListingStatus, { label: string; className: string }> = {
-  PENDING: { label: '심사대기', className: 'bg-[#e1e2e4] text-[#505050]' },
-  PUBLISHED: { label: '승인완료', className: 'bg-[#ccfaed] text-[#008b64]' },
-  UPDATE_PENDING: { label: '수정신청', className: 'bg-[#e8f1fd] text-[#165abd]' },
-  REJECTED: { label: '반려', className: 'bg-[#feece9] text-[#c60e21]' },
-}
 
 function registeredDate(value: string) {
   const matched = value.match(/^(\d{4})-(\d{2})-(\d{2})/)
@@ -59,7 +54,11 @@ function ReviewCard({ entry }: { entry: AdminListingEntry }) {
   const badge = STATUS_BADGES[listing.status]
 
   return (
-    <article className="border-line-normal flex w-full flex-col rounded-2xl border bg-white p-4">
+    <Link
+      to={`/admin/listings/${entry.listing.listingId}`}
+      state={{ entry }}
+      className="border-line-normal flex w-full flex-col rounded-2xl border bg-white p-4 transition hover:brightness-98"
+    >
       <div className="flex min-w-0 items-start justify-between gap-4">
         <div className="min-w-0">
           <h2 className="text-neutral-70 truncate text-lg leading-6 font-semibold">
@@ -69,25 +68,20 @@ function ReviewCard({ entry }: { entry: AdminListingEntry }) {
             {listing.type.label} · {registeredDate(listing.createdAt)} 등록
           </p>
         </div>
-        <span
-          className={`flex h-6 w-16 shrink-0 items-center justify-center rounded-[4px] px-3 py-0.5 text-sm leading-5 font-medium whitespace-nowrap ${badge.className}`}
-        >
-          {badge.label}
-        </span>
+        <span className={`${statusBadgeClass} w-16 ${badge.className}`}>{badge.label}</span>
       </div>
 
       <div className="border-cool-neutral-8 mt-2.5 flex items-end justify-between gap-4 border-t pt-2.5">
-        {/* 관리자 목록 응답에는 landlordId만 있고 등록자 이름은 아직 없다. */}
-        <p className="text-cool-neutral-30 truncate text-base leading-6 font-medium">등록자: -</p>
-        <span
-          aria-label="심사 상세 화면 준비 중"
-          className="text-primary-40 flex shrink-0 items-center text-base leading-6 font-normal"
-        >
+        {/* 임대인 이름을 서버가 모르면 landlordName 필드 자체가 빠진다. */}
+        <p className="text-cool-neutral-30 truncate text-base leading-6 font-medium">
+          등록자: {entry.landlordName ?? '-'}
+        </p>
+        <span className="text-primary-40 flex shrink-0 items-center text-base leading-6 font-normal">
           검토하기
           <ReviewChevronIcon />
         </span>
       </div>
-    </article>
+    </Link>
   )
 }
 
@@ -133,7 +127,8 @@ export default function AdminPage() {
         selectedStatus === 'ALL' || entry.listing.status === selectedStatus
       const queryMatches =
         normalizedQuery.length === 0 ||
-        entry.listing.title.toLocaleLowerCase('ko-KR').includes(normalizedQuery)
+        entry.listing.title.toLocaleLowerCase('ko-KR').includes(normalizedQuery) ||
+        (entry.landlordName ?? '').toLocaleLowerCase('ko-KR').includes(normalizedQuery)
       return statusMatches && queryMatches
     })
   }, [entries, query, selectedStatus])
@@ -159,7 +154,7 @@ export default function AdminPage() {
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 autoFocus
-                placeholder="매물명으로 검색"
+                placeholder="건물명, 신청자명으로 검색"
                 className="text-label-normal placeholder:text-cool-neutral-20 w-full bg-transparent text-base outline-none"
               />
             </label>
@@ -218,7 +213,7 @@ export default function AdminPage() {
                 type="search"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="매물명으로 검색"
+                placeholder="건물명, 신청자명으로 검색"
                 className="text-label-normal placeholder:text-cool-neutral-20 w-full bg-transparent text-base outline-none"
               />
             </label>

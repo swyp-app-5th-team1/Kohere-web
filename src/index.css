@@ -24,11 +24,18 @@
   --color-cool-neutral-50: #70737c;
   --color-cool-neutral-70: #46474c;
   --color-cool-neutral-80: #292a2d;
+  /* iOS 팔레트(CoolNeutral/coolNeutral85)에서 옮겼다. 관리자 심사 상세의 사진 장수 문구가 쓴다. */
+  --color-cool-neutral-85: #212225;
 
   --color-neutral-10: #dcdcdc;
+  /* iOS 팔레트(Neutral/neutral20)에서 옮겼다. 관리자 심사 상세의 뒤로가기 줄이 쓴다. */
+  --color-neutral-20: #b0b0b0;
   --color-neutral-5: #f7f7f7;
   --color-neutral-30: #999999;
+  /* 40 · 60 은 iOS 팔레트(Assets.xcassets/Color/Palette/Neutral)에서 옮겼다. 관리자 심사 상세가 쓴다. */
+  --color-neutral-40: #8a8a8a;
   --color-neutral-50: #767676;
+  --color-neutral-60: #5c5c5c;
   --color-neutral-70: #505050;
 
   /* 입력 필드 오류 상태 */

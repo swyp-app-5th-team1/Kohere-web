@@ -814,7 +814,8 @@ export default function AdminListingReviewPage() {
             시안대로 화면 아래에 붙어 있고, 위 내용만 뒤에서 스크롤된다.
             높이 302 = 위 20 + 제목 24 + 8 + 입력칸 120 + 40 + 버튼 48 + 아래 40. 테두리는 gray/300 1px.
           */}
-          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-gray-300 bg-white">
+          {/* 사이드메뉴(z-30)와 헤더(z-40)보다 아래에 둔다. 메뉴를 열면 이 영역이 덮여야 한다. */}
+          <div className="fixed inset-x-0 bottom-0 z-20 border-t border-gray-300 bg-white">
             <div className="flex w-full flex-col px-5 pt-5 pb-6 md:px-[100px] md:pb-10">
               <Field label="반려사유" gap="gap-2">
                 <div className="flex w-full flex-col gap-1">

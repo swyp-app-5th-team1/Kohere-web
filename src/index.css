@@ -37,6 +37,8 @@
   --color-neutral-50: #767676;
   --color-neutral-60: #5c5c5c;
   --color-neutral-70: #505050;
+  /* 알림 항목 제목. iOS 팔레트의 Neutral/80과 같은 값이다. */
+  --color-neutral-80: #2a2a2a;
 
   /* 입력 필드 오류 상태 */
   --color-status-red-5: #fee7ea;

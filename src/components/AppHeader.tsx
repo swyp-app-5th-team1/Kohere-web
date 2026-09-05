@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useCallback, useId, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import markUrl from '../assets/kohere-mark.svg'
 import menuUrl from '../assets/icon-menu.svg'
 import bellUrl from '../assets/icon-bell-fill.svg'
 import { SideMenu } from './SideMenu'
+import { NotificationPanel, type AppNotification } from './NotificationPanel'
 
 type AppHeaderProps = {
   /** 관리자 모바일 시안은 햄버거 대신 검색·알림·프로필을 노출한다. */
@@ -34,12 +35,17 @@ function ProfileIcon() {
   )
 }
 
-/**
- * 로그인 후 화면 공통 헤더 (햄버거 메뉴 · 로고 · 알림).
- * 알림은 화면만 잡아둔 상태라 동작이 없다.
- */
+/** 로그인 후 화면 공통 헤더 (햄버거 메뉴 · 로고 · 알림). */
 export function AppHeader({ variant = 'default', onMobileSearch }: AppHeaderProps) {
-  const [menuOpen, setMenuOpen] = useState(false)
+  const [openPanel, setOpenPanel] = useState<'menu' | 'notifications' | null>(null)
+  // 알림 수신 API가 준비되기 전까지 실제 화면은 빈 목록을 보여 준다.
+  const [notifications, setNotifications] = useState<AppNotification[]>([])
+  const notificationTriggerRef = useRef<HTMLButtonElement>(null)
+  const notificationPanelId = useId()
+  const closeNotifications = useCallback(() => setOpenPanel(null), [])
+  const menuOpen = openPanel === 'menu'
+  const notificationsOpen = openPanel === 'notifications'
+  const hasUnread = notifications.some((notification) => !notification.isRead)
   const admin = variant === 'admin'
 
   return (
@@ -50,7 +56,7 @@ export function AppHeader({ variant = 'default', onMobileSearch }: AppHeaderProp
             type="button"
             aria-label={menuOpen ? '메뉴 닫기' : '메뉴 열기'}
             aria-expanded={menuOpen}
-            onClick={() => setMenuOpen((open) => !open)}
+            onClick={() => setOpenPanel((open) => (open === 'menu' ? null : 'menu'))}
             className={(admin ? 'hidden md:flex ' : 'flex ') + 'size-12 items-center justify-center p-2'}
           >
             <img src={menuUrl} alt="" className="size-6" />
@@ -88,35 +94,63 @@ export function AppHeader({ variant = 'default', onMobileSearch }: AppHeaderProp
           </Link>
         </div>
 
-        {admin && (
-          <div className="text-label-normal flex items-center md:hidden">
+        <div className="text-label-normal flex items-center">
+          {admin && (
             <button
               type="button"
               aria-label="매물 검색"
               onClick={onMobileSearch}
-              className="flex size-12 items-center justify-center"
+              className="flex size-12 items-center justify-center md:hidden"
             >
               <SearchIcon />
             </button>
-            <button type="button" aria-label="알림" className="flex size-12 items-center justify-center">
+          )}
+
+          <div className="md:relative">
+            <button
+              ref={notificationTriggerRef}
+              type="button"
+              aria-label={hasUnread ? '알림, 읽지 않은 알림 있음' : '알림'}
+              aria-expanded={notificationsOpen}
+              aria-haspopup="dialog"
+              aria-controls={notificationsOpen ? notificationPanelId : undefined}
+              onClick={() => setOpenPanel((open) => (open === 'notifications' ? null : 'notifications'))}
+              className={
+                'relative flex size-12 items-center justify-center rounded-full transition-colors hover:bg-cool-neutral-5 focus-visible:outline-2 focus-visible:outline-primary-50 ' +
+                (notificationsOpen ? 'bg-cool-neutral-5' : '')
+              }
+            >
               <img src={bellUrl} alt="" className="size-6" />
+              {hasUnread && (
+                <span aria-hidden="true" className="bg-primary-50 absolute top-2.5 right-2.5 size-2 rounded-full ring-2 ring-white" />
+              )}
             </button>
-            <Link to="/profile" aria-label="마이페이지" className="flex size-12 items-center justify-center">
+
+            {notificationsOpen && (
+              <NotificationPanel
+                id={notificationPanelId}
+                notifications={notifications}
+                triggerRef={notificationTriggerRef}
+                onClose={closeNotifications}
+                onRead={(id) => setNotifications((items) =>
+                  items.map((item) => (item.id === id ? { ...item, isRead: true } : item)),
+                )}
+                onReadAll={() => setNotifications((items) =>
+                  items.map((item) => ({ ...item, isRead: true })),
+                )}
+              />
+            )}
+          </div>
+
+          {admin && (
+            <Link to="/profile" aria-label="마이페이지" className="flex size-12 items-center justify-center md:hidden">
               <ProfileIcon />
             </Link>
-          </div>
-        )}
-
-        <button
-          type="button"
-          aria-label="알림"
-          className={(admin ? 'hidden md:flex ' : 'flex ') + 'size-12 items-center justify-center'}
-        >
-          <img src={bellUrl} alt="" className="size-6" />
-        </button>
+          )}
+        </div>
       </header>
 
-      <SideMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
+      <SideMenu open={menuOpen} onClose={() => setOpenPanel(null)} />
     </>
   )
 }
